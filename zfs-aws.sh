@@ -20,6 +20,10 @@ set -o pipefail
 #   and specifies `backup.bucket.aws` as the backup destination.
 readonly META_AWS_BUCKET="zfs-utils:aws-bucket"
 
+# All uploaded ZFS snapshots are tagged with this tag upon successful completion
+# of the upload process. The tag helps in tracking and verifying the upload status.
+readonly AWS_UPLOAD_STATUS_TAG='{"TagSet":[{"Key":"zfs-utils.upload-status","Value":"success"}]}'
+
 readonly PV=$(which pv)
 readonly ZFS=$(which zfs)
 readonly AWS=$(which aws)
@@ -77,17 +81,21 @@ function full_upload {
 
   echo " - Starting full upload of '$latest_snapshot' (size: $snapshot_size_iec)."
 
-  ${ZFS} send --raw -cp $latest_snapshot \
-    | ${PV} -F "   %t %a %p" -s $snapshot_size \
-    | ${AWS} s3 cp - "s3://$aws_bucket/$aws_directory/$aws_filename" --expected-size $snapshot_size
-  local exit_status=$?
-
-  if [[ $exit_status -eq 0 ]]; then
-    echo " - Snapshot '$latest_snapshot' has been successfully uploaded to '$aws_bucket' bucket."
-  else
+  # Upload latest snapshot
+  if ! ${ZFS} send --raw -cp $latest_snapshot \
+        | ${PV} -F "   %t %a %p" -s $snapshot_size \
+        | ${AWS} s3 cp - "s3://$aws_bucket/$aws_directory/$aws_filename" --expected-size $snapshot_size; then
     echo " - Error: Failed to upload '$latest_snapshot' snapshot to '$aws_bucket' bucket."
     return 1
   fi
+
+  # Tag as completed
+  ${AWS} s3api put-object-tagging \
+    --bucket "$aws_bucket" \
+    --key "$aws_directory/$aws_filename" \
+    --tagging "$AWS_UPLOAD_STATUS_TAG"
+
+  echo " - Snapshot '$latest_snapshot' has been successfully uploaded to '$aws_bucket' bucket."
 }
 
 function incremental_upload {
@@ -105,17 +113,21 @@ function incremental_upload {
 
   echo " - Starting incremental upload of '$latest_snapshot' (size: $snapshot_size_iec)."
 
-  ${ZFS} send --raw -cpi $synced_snapshot $latest_snapshot \
-    | ${PV} -F "   %t %a %p" -s $snapshot_size \
-    | ${AWS} s3 cp - "s3://$aws_bucket/$aws_directory/$aws_filename" --expected-size $snapshot_size
-  local exit_status=$?
-  
-  if [[ $exit_status -eq 0 ]]; then
-    echo " - Snapshot '$latest_snapshot' has been successfully uploaded to '$aws_bucket' bucket."
-  else
+  # Upload snapshot diff @synced <-> @latest
+  if ! ${ZFS} send --raw -cpi $synced_snapshot $latest_snapshot \
+        | ${PV} -F "   %t %a %p" -s $snapshot_size \
+        | ${AWS} s3 cp - "s3://$aws_bucket/$aws_directory/$aws_filename" --expected-size $snapshot_size; then
     echo " - Error: Failed to upload '$latest_snapshot' snapshot to '$aws_bucket' bucket."
     return 1
   fi
+
+  # Tag as completed
+  ${AWS} s3api put-object-tagging \
+    --bucket "$aws_bucket" \
+    --key "$aws_directory/$aws_filename" \
+    --tagging "$AWS_UPLOAD_STATUS_TAG"
+
+  echo " - Snapshot '$latest_snapshot' has been successfully uploaded to '$aws_bucket' bucket."
 }
 
 function bytes_to_human {
