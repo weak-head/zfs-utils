@@ -24,6 +24,7 @@ readonly META_AWS_BUCKET="zfs-utils:aws-bucket"
 # of the upload process. The tag helps in tracking and verifying the upload status.
 readonly AWS_UPLOAD_STATUS_TAG='{"TagSet":[{"Key":"zfs-utils.upload-status","Value":"success"}]}'
 
+readonly JQ=$(which jq)
 readonly PV=$(which pv)
 readonly ZFS=$(which zfs)
 readonly AWS=$(which aws)
@@ -38,8 +39,22 @@ function upload {
 
   # We cannot proceed if the dataset has no snapshots.
   if [[ -z "$latest_snapshot" ]]; then
-    echo "Error: No snapshot found for dataset '$dataset'. AWS S3 upload cannot proceed."
+    log err "No snapshots found for dataset '$dataset'. Cannot proceed with upload to AWS S3."
     return 1
+  fi
+
+  # Check if the latest uploaded file is tagged as complete.
+  # Without the completion tag, the file cannot be trusted.
+  if [[ -n "$latest_uploaded" ]]; then
+    local upload_status=$( ${AWS} s3api get-object-tagging --bucket "$aws_bucket" --key "$aws_directory/$latest_uploaded" \
+      | jq -r '.TagSet[] | select(.Key == "zfs-utils.upload-status") | .Value' )
+
+    if [[ "$upload_status" == "success" ]]; then
+      log info "The latest uploaded file '$aws_directory/$latest_uploaded' has been validated."
+    else
+      log warn "The latest uploaded file '$aws_directory/$latest_uploaded' is missing completion tag or is marked as incomplete. Incremental upload is not possible."
+      latest_uploaded=""
+    fi
   fi
 
   # Verify if there exist a local version of the dataset snapshot,
@@ -51,21 +66,33 @@ function upload {
     synced_snapshot=$( ${ZFS} list -Ht snap -o name | grep "^$dataset@$uploaded_label$" )
   fi
 
-  # If the latest snapshot is already uploaded, there is nothing left to do.
+  # Check if latest uploaded file matches the latest available snapshot.
   if [[ "$latest_snapshot" == "$synced_snapshot" ]]; then
-    echo "The latest snapshot '$latest_snapshot' is already uploaded to AWS S3."
+    log info "Snapshot '$latest_snapshot' is already uploaded. Skipping the dataset '$dataset' upload."
     return 0
   fi
 
-  if [[ -n "$latest_snapshot" && -n "$synced_snapshot" ]]; then
-    echo "Initiating incremental upload of dataset '$dataset'."
+  # A previous snapshot has been uploaded, but there is no corresponding local
+  # snapshot available. Incremental upload cannot be applied.
+  if [[ -n "$latest_uploaded" && -z "$synced_snapshot" ]]; then
+    log warn "No local snapshot matches the latest uploaded file '$latest_uploaded'. Incremental upload is not possible."
+  fi
+
+  if [[ -n "$synced_snapshot" ]]; then
+    log info "The latest uploaded file '$latest_uploaded' corresponds to the local snapshot '$synced_snapshot'."
     incremental_upload $synced_snapshot $latest_snapshot $aws_bucket $aws_directory
   else
-    echo "Initiating full upload of dataset '$dataset'."
     full_upload $latest_snapshot $aws_bucket $aws_directory
   fi
 
-  return $?
+  local exit_status=$?
+  if [[ $exit_status -eq 0 ]]; then
+    log info "Dataset '$dataset' has been successfully uploaded to AWS S3 bucket '$aws_bucket'."
+  else
+    log warn "Failed to upload dataset '$dataset' to AWS S3 bucket '$aws_bucket'."
+  fi
+
+  return $exit_status
 }
 
 function full_upload {
@@ -79,23 +106,20 @@ function full_upload {
   local snapshot_size=$( ${ZFS} send --raw -Pnv -cp $latest_snapshot | awk '/size/ {print $2}' )
   local snapshot_size_iec=$(bytes_to_human $snapshot_size)
 
-  echo " - Starting full upload of '$latest_snapshot' (size: $snapshot_size_iec)."
+  log info "Starting full upload of snapshot '$latest_snapshot' to 's3://$aws_bucket/$aws_directory/$aws_filename' (size: $snapshot_size_iec)."
 
   # Upload latest snapshot
   if ! ${ZFS} send --raw -cp $latest_snapshot \
-        | ${PV} -F "   %t %a %p" -s $snapshot_size \
-        | ${AWS} s3 cp - "s3://$aws_bucket/$aws_directory/$aws_filename" --expected-size $snapshot_size; then
-    echo " - Error: Failed to upload '$latest_snapshot' snapshot to '$aws_bucket' bucket."
+        | ${PV} -s $snapshot_size \
+        | ${AWS} s3 cp - "s3://$aws_bucket/$aws_directory/$aws_filename" \
+            --expected-size $snapshot_size > >(capture_errors) 2>&1; then
     return 1
   fi
 
-  # Tag as completed
-  ${AWS} s3api put-object-tagging \
-    --bucket "$aws_bucket" \
-    --key "$aws_directory/$aws_filename" \
-    --tagging "$AWS_UPLOAD_STATUS_TAG"
+  log info "Successfully uploaded 's3://$aws_bucket/$aws_directory/$aws_filename'."
 
-  echo " - Snapshot '$latest_snapshot' has been successfully uploaded to '$aws_bucket' bucket."
+  mark_as_completed $aws_bucket "$aws_directory/$aws_filename"
+  return $?
 }
 
 function incremental_upload {
@@ -111,23 +135,57 @@ function incremental_upload {
   local snapshot_size=$( ${ZFS} send --raw -Pnv -cpi $synced_snapshot $latest_snapshot | awk '/size/ {print $2}' )
   local snapshot_size_iec=$(bytes_to_human $snapshot_size)
 
-  echo " - Starting incremental upload of '$latest_snapshot' (size: $snapshot_size_iec)."
+  log info "Starting incremental upload of snapshot '$latest_snapshot' based on '$synced_snapshot' to 's3://$aws_bucket/$aws_directory/$aws_filename' (size: $snapshot_size_iec)."
 
   # Upload snapshot diff @synced <-> @latest
   if ! ${ZFS} send --raw -cpi $synced_snapshot $latest_snapshot \
-        | ${PV} -F "   %t %a %p" -s $snapshot_size \
-        | ${AWS} s3 cp - "s3://$aws_bucket/$aws_directory/$aws_filename" --expected-size $snapshot_size; then
-    echo " - Error: Failed to upload '$latest_snapshot' snapshot to '$aws_bucket' bucket."
+        | ${PV} -s $snapshot_size \
+        | ${AWS} s3 cp - "s3://$aws_bucket/$aws_directory/$aws_filename" \
+            --expected-size $snapshot_size > >(capture_errors) 2>&1; then
     return 1
   fi
 
-  # Tag as completed
-  ${AWS} s3api put-object-tagging \
-    --bucket "$aws_bucket" \
-    --key "$aws_directory/$aws_filename" \
-    --tagging "$AWS_UPLOAD_STATUS_TAG"
+  log info "Successfully uploaded 's3://$aws_bucket/$aws_directory/$aws_filename'."
 
-  echo " - Snapshot '$latest_snapshot' has been successfully uploaded to '$aws_bucket' bucket."
+  mark_as_completed $aws_bucket "$aws_directory/$aws_filename"
+  return $?
+}
+
+function mark_as_completed {
+  local aws_bucket=${1:-}
+  local aws_key=${2:-}
+
+  if ! ${AWS} s3api put-object-tagging --bucket "$aws_bucket" --key "$aws_key" \
+        --tagging "$AWS_UPLOAD_STATUS_TAG" > >(capture_errors) 2>&1; then
+    log err "Failed to set completion tag for 's3://$aws_bucket/$aws_key'."
+    return 1
+  fi
+
+  log info "Successfully set completion tag for 's3://$aws_bucket/$aws_key'."
+}
+
+function validate_aws_bucket {
+  local aws_bucket=${1:-}
+  local aws_bucket_ls=$( ${AWS} s3 ls "$aws_bucket" 2>&1 )
+
+  if [[ $aws_bucket_ls =~ 'An error occurred (AccessDenied)' ]]; then
+    log err "Unable to access AWS S3 bucket '$aws_bucket': Access denied."
+    return 1
+  elif [[ $aws_bucket_ls =~ 'An error occurred (NoSuchBucket)' ]]; then
+    log err "AWS S3 bucket '$aws_bucket' not found."
+    return 1
+  else
+    log info "Access to AWS S3 bucket '$aws_bucket' confirmed."
+  fi
+}
+
+function check_partial_uploads {
+  local aws_bucket=${1:-}
+  local current_uploads=$( ${AWS} s3api list-multipart-uploads --bucket "$aws_bucket" )
+
+  if [[ -n $current_uploads ]]; then
+    log warn "Incomplete multipart uploads exists for AWS S3 bucket '$aws_bucket'."
+  fi
 }
 
 function bytes_to_human {
@@ -143,22 +201,34 @@ function bytes_to_human {
   echo "$i$d ${S[$s]}"
 }
 
-if [[ -z "$ZFS" || -z "$PV" || -z "$AWS" ]]; then
-  echo "Error: Required binaries (zfs, pv, aws) are not found."
+function capture_errors {
+  while IFS= read -r line; do
+    log err "$line"
+  done
+}
+
+function log {
+  local level=$1; shift
+  case $level in
+    (err*) logger -t "zfs-aws" -p "user.err" "$*";     echo "Error: $*" 1>&2 ;;
+    (war*) logger -t "zfs-aws" -p "user.warning" "$*"; echo "Warning: $*" 1>&2 ;;
+    (inf*) logger -t "zfs-aws" -p "user.info" "$*";    echo "$*" ;;
+  esac
+}
+
+if [[ -z "$ZFS" || -z "$PV" || -z "$AWS" || -z "$JQ" ]]; then
+  log err "Missing required binaries: zfs, pv, aws, jq."
   exit 1
 fi
 
 ${ZFS} list -o name,${META_AWS_BUCKET} -H -r | awk '$2 != "-"' | while IFS=$'\t' read -r dataset aws_bucket; do
-  echo ""
-  echo "===== Uploading '$dataset' to '$aws_bucket' ====="
-  upload $dataset $aws_bucket
-  exit_status=$?
+  log info "Initiating upload of dataset '$dataset' to AWS S3 bucket '$aws_bucket'."
 
-  if [[ $exit_status -ne 0 ]]; then
-    echo "Error: Failed to upload '$dataset' dataset to AWS S3 '$aws_bucket' bucket. Terminating process."
-    exit $exit_status
+  if ! validate_aws_bucket $aws_bucket; then
+    log warn "Skipping dataset '$dataset' upload."
+    continue
   fi
 
-  echo "Dataset '$dataset' has been successfully processed."
-  echo ""
+  check_partial_uploads $aws_bucket
+  upload $dataset $aws_bucket
 done
