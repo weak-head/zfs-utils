@@ -15,9 +15,8 @@ set -o pipefail
 #   This marks the `odin/services/cloud` dataset for replication to `thor/services/cloud`.
 readonly META_REPLICATION_TARGET="zfs-utils:replication-target"
 
-PV=$(command -v pv)
-ZFS=$(command -v zfs)
-readonly PV ZFS
+readonly PV=$(command -v pv)
+readonly ZFS=$(command -v zfs)
 
 function log {
   local level=$1; shift
@@ -28,85 +27,91 @@ function log {
   esac
 }
 
+function capture_errors {
+  while IFS= read -r line; do
+    log err "$line"
+  done
+}
+
 function replicate_dataset {
-  local source=${1:-}
-  local target=${2:-}
+  local source_dataset=$1
+  local target_dataset=$2
 
-  local -r latest_source_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${source}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
-  local -r latest_target_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${target}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
+  local base_snapshot=""
+  local source_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${source_dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
+  local target_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${target_dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
 
-  if [[ -z "${latest_source_snapshot}" ]]; then
-    log err "No snapshots found for source dataset '${source}'. Replication aborted."
+  if [[ -z "${source_snapshot}" ]]; then
+    log err "Replication aborted: No snapshots found for source dataset '${source_dataset}'."
     return 1
   fi
   
-  local replicated_source_snapshot=""
-  if [[ -n "${latest_target_snapshot}" ]]; then
-    replicated_source_snapshot=$( ${ZFS} list -Ht snap -o name | grep "^${source}@${latest_target_snapshot#*@}$" )
-  fi
+  if [[ -n "${target_snapshot}" ]]; then
+    if [[ "${source_snapshot#*@}" == "${target_snapshot#*@}" ]]; then
+      log info "Replication skipped: source '${source_dataset}' is already replicted to the target '${target_dataset}'."
+      return 0
+    fi
 
-  if [[ "${latest_source_snapshot}" == "${replicated_source_snapshot}" ]]; then
-    log info "Snapshot '${latest_source_snapshot}' is already fully replicated. Skipping replication of dataset '${source}'."
-    return 0
-  fi
-  
-  if [[ -n "${latest_target_snapshot}" && -z "${replicated_source_snapshot}" ]]; then
-    log err "No matching source snapshot found for target snapshot '${latest_target_snapshot}'. Manual intervention required: the source snapshot may be missing or deleted."
-    return 1
-  fi
+    base_snapshot=$( ${ZFS} list -Ht snap -o name | grep "^${source_dataset}@${target_snapshot#*@}$" )
+    if [[ -z "${base_snapshot}" ]]; then
+      log err "Replication halted: Target dataset '${target_dataset}' lacks matching snapshots with" \
+              "source dataset '${source_dataset}', indicating possible dataset desynchronization." \
+              "Manual intervention is required to restore continuity."
+      return 1
+    fi
 
-  if [[ -n "${latest_target_snapshot}" && -n "${replicated_source_snapshot}" ]]; then
-    log info "Target snapshot '${latest_target_snapshot}' matches the source snapshot '${replicated_source_snapshot}'. Proceeding with incremental replication."
-    incremental_replication "${replicated_source_snapshot}" "${latest_source_snapshot}" "${target}"
+    replicate_incr "${base_snapshot}" "${source_snapshot}" "${target_dataset}"
   else
-    full_replication "${latest_source_snapshot}" "${target}"
+    replicate_full "${source_snapshot}" "${target_dataset}"
   fi
 }
 
-function full_replication {
-  local source_snapshot=${1:-}
-  local target_dataset=${2:-}
+function replicate_full {
+  local source_snapshot=$1
+  local target_dataset=$2
 
-  local -r snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${source_snapshot}" | awk '/size/ {print $2}' )
-  local -r snapshot_size_iec=$(bytes_to_human "${snapshot_size}")
+  local snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${source_snapshot}" | awk '/size/ {print $2}' )
 
-  log info "Initiating full replication of snapshot '${source_snapshot}' to dataset '${target_dataset}' (size: ${snapshot_size_iec})."
+  log info "Initiating full replication of snapshot '${source_snapshot}'" \
+           "to dataset '${target_dataset}' (size: $(bytes_to_human ${snapshot_size}))."
 
   if ! ${ZFS} send --raw -cp "${source_snapshot}" \
         | ${PV} -s "${snapshot_size}" \
-        | ${ZFS} recv "${target_dataset}"; then
+        | ${ZFS} recv "${target_dataset}" > >(capture_errors) 2>&1; then
     return 1
   fi
 }
 
-function incremental_replication {
-  local replicated_source_snapshot=${1:-}
-  local latest_source_snapshot=${2:-}
-  local target_dataset=${3:-}
+function replicate_incr {
+  local base_snapshot=$1
+  local change_snapshot=$2
+  local target_dataset=$3
 
-  local -r snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${replicated_source_snapshot}" "${latest_source_snapshot}" | awk '/size/ {print $2}' )
-  local -r snapshot_size_iec=$(bytes_to_human "${snapshot_size}")
+  local snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${base_snapshot}" "${change_snapshot}" | awk '/size/ {print $2}' )
 
-  log info "Initiating incremental replication from snapshot '${replicated_source_snapshot}' to '${latest_source_snapshot}' for dataset '${target_dataset}' (size: ${snapshot_size_iec})."
+  log info "Initiating incremental replication from snapshot '${base_snapshot}'" \
+           "to '${change_snapshot}' for dataset '${target_dataset}' (size: $(bytes_to_human ${snapshot_size}))."
 
-  if ! ${ZFS} send --raw -cpi "${replicated_source_snapshot}" "${latest_source_snapshot}" \
+  if ! ${ZFS} send --raw -cpi "${base_snapshot}" "${change_snapshot}" \
         | ${PV} -s "${snapshot_size}" \
-        | ${ZFS} recv "${target_dataset}"; then
+        | ${ZFS} recv "${target_dataset}" > >(capture_errors) 2>&1; then
     return 1
   fi
 }
 
 function bytes_to_human {
-  local i=${1:-0} d="" s=0 
-  local S=("Bytes" "KiB" "MiB" "GiB" "TiB" "PiB" "EiB" "YiB" "ZiB")
+  local bytes=${1:-0}
+  local decimal_part=""
+  local suffix_index=0
+  local suffixes=("Bytes" "KiB" "MiB" "GiB" "TiB" "PiB" "EiB" "YiB" "ZiB")
 
-  while ((i > 1024 && s < ${#S[@]}-1)); do
-    printf -v d ".%02d" $((i % 1024 * 100 / 1024))
-    i=$((i / 1024))
-    s=$((s + 1))
+  while ((bytes > 1024 && suffix_index < ${#suffixes[@]} - 1)); do
+    decimal_part=$(printf ".%02d" $((bytes % 1024 * 100 / 1024)))
+    bytes=$((bytes / 1024))
+    suffix_index=$((suffix_index + 1))
   done
 
-  echo "$i$d ${S[$s]}"
+  echo "${bytes}${decimal_part} ${suffixes[${suffix_index}]}"
 }
 
 if [[ -z "${ZFS}" || -z "${PV}" ]]; then
@@ -117,11 +122,11 @@ fi
 ${ZFS} list -o name,"${META_REPLICATION_TARGET}" -H -r \
     | awk -F '\t' '$2 != "-" && $1 != $2' \
     | while IFS=$'\t' read -r source target; do
-  log info "Initiating replication of dataset '${source}' to '${target}'."
+  log info "Starting replication of dataset '${source}' to '${target}'."
 
   if replicate_dataset "${source}" "${target}"; then
-    log info "Successfully replicated dataset '${source}' to '${target}'."
+    log info "Source dataset '${source}' is replicated to target dataset '${target}'."
   else
-    log warn "Replication failed for dataset '${source}' to '${target}'."
+    log err "Failed to replicate source dataset '${source}' to target dataset '${target}'."
   fi
 done
