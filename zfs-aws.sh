@@ -28,10 +28,11 @@ readonly AWS_META_SNAPSHOT_NAME="snapshot-name"
 readonly AWS_META_SNAPSHOT_BASE="snapshot-base"
 readonly AWS_META_SNAPSHOT_KIND="snapshot-kind"
 
-readonly JQ=$(command -v jq)
-readonly PV=$(command -v pv)
-readonly ZFS=$(command -v zfs)
-readonly AWS=$(command -v aws)
+JQ=$(command -v jq)
+PV=$(command -v pv)
+ZFS=$(command -v zfs)
+AWS=$(command -v aws)
+readonly JQ PV ZFS AWS
 
 function log {
   local level=$1; shift
@@ -44,34 +45,35 @@ function log {
 
 function capture_errors {
   while IFS= read -r line; do
-    log err "$line"
+    log err "${line}"
   done
 }
 
 function get_upload_status {
-  local aws_bucket=$1 
-  local aws_key=$2
+  local aws_bucket=$1 aws_key=$2
+
   ${AWS} s3api get-object-tagging --bucket "${aws_bucket}" --key "${aws_key}" \
     | jq -r ".TagSet[] | select(.Key == \"${AWS_TAG_UPLOAD_STATUS}\").Value"
 }
 
 function set_upload_status {
-  local aws_bucket=$1 
-  local aws_key=$2 
-  local status=$3
+  local aws_bucket=$1 aws_key=$2 status=$3
+
   ${AWS} s3api put-object-tagging --bucket "${aws_bucket}" --key "${aws_key}" \
     --tagging "{\"TagSet\":[{\"Key\":\"${AWS_TAG_UPLOAD_STATUS}\",\"Value\":\"${status}\"}]}" \
     > >(capture_errors) 2>&1
 }
 
 function upload {
-  local dataset=$1 
-  local aws_bucket=$2 
+  local dataset=$1 aws_bucket=$2
   local aws_directory="${dataset//\//.}"
 
-  local latest_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
-  local latest_uploaded=$( ${AWS} s3 ls "s3://${aws_bucket}/${aws_directory}/" | grep -v "/$" | sort -r | head -1 | awk '{print $4}' )
   local synced_snapshot=""
+  local latest_snapshot=""
+  local latest_uploaded=""
+
+  latest_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
+  latest_uploaded=$( ${AWS} s3 ls "s3://${aws_bucket}/${aws_directory}/" | grep -v "/$" | sort -r | head -1 | awk '{print $4}' )
 
   if [[ -z "${latest_snapshot}" ]]; then
     log err "No available snapshots found for dataset '${dataset}'. Upload to AWS S3 cannot proceed."
@@ -79,7 +81,8 @@ function upload {
   fi
 
   if [[ -n "${latest_uploaded}" ]]; then
-    local upload_status=$(get_upload_status "${aws_bucket}" "${aws_directory}/${latest_uploaded}")
+    local upload_status=""
+    upload_status=$(get_upload_status "${aws_bucket}" "${aws_directory}/${latest_uploaded}")
 
     if [[ "${upload_status}" == "success" ]]; then
       synced_snapshot=$( ${ZFS} list -Ht snap -o name | grep "^${dataset}@${latest_uploaded%_*}$" )
@@ -105,14 +108,15 @@ function upload {
 }
 
 function upload_full {
-  local snapshot=$1 
-  local aws_bucket=$2 
-  local aws_directory=$3
+  local snapshot=$1 aws_bucket=$2 aws_directory=$3
 
-  local aws_filename="${snapshot##*@}_full"
-  local snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${snapshot}" | awk '/size/ {print $2}' )
+  local aws_filename=""
+  local snapshot_size=""
+
+  aws_filename="${snapshot##*@}_full"
+  snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${snapshot}" | awk '/size/ {print $2}' )
   
-  log info "Initiating full upload of snapshot '${snapshot}' to 's3://${aws_bucket}/${aws_directory}/${aws_filename}' (size: $(bytes_to_human ${snapshot_size}))."
+  log info "Initiating full upload of snapshot '${snapshot}' to 's3://${aws_bucket}/${aws_directory}/${aws_filename}' (size: $(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cp "${snapshot}" \
         | ${PV} -s "${snapshot_size}" \
@@ -127,15 +131,15 @@ function upload_full {
 }
 
 function upload_incr {
-  local synced_snapshot=$1
-  local latest_snapshot=$2
-  local aws_bucket=$3
-  local aws_directory=$4
+  local synced_snapshot=$1 latest_snapshot=$2 aws_bucket=$3 aws_directory=$4
 
-  local aws_filename="${latest_snapshot##*@}_incr"
-  local snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${synced_snapshot}" "${latest_snapshot}" | awk '/size/ {print $2}' )
+  local aws_filename=""
+  local snapshot_size=""
 
-  log info "Initiating incremental upload of snapshot '${latest_snapshot}' based on '${synced_snapshot}' to 's3://${aws_bucket}/${aws_directory}/${aws_filename}' (size: $(bytes_to_human ${snapshot_size}))."
+  aws_filename="${latest_snapshot##*@}_incr"
+  snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${synced_snapshot}" "${latest_snapshot}" | awk '/size/ {print $2}' )
+
+  log info "Initiating incremental upload of snapshot '${latest_snapshot}' based on '${synced_snapshot}' to 's3://${aws_bucket}/${aws_directory}/${aws_filename}' (size: $(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cpi "${synced_snapshot}" "${latest_snapshot}" \
         | ${PV} -s "${snapshot_size}" \
@@ -151,12 +155,14 @@ function upload_incr {
 
 function check_aws_access {
   local aws_bucket=$1
-  local aws_bucket_ls=$( ${AWS} s3 ls "${aws_bucket}" 2>&1 )
 
-  if [[ "${aws_bucket_ls}" =~ 'An error occurred (AccessDenied)' ]]; then
+  local aws_bucket_ls=""
+  aws_bucket_ls=$( ${AWS} s3 ls "${aws_bucket}" 2>&1 )
+
+  if [[ "${aws_bucket_ls}" == *"An error occurred (AccessDenied)"* ]]; then
     log err "Access denied: Unable to access AWS S3 bucket '${aws_bucket}'."
     return 1
-  elif [[ "${aws_bucket_ls}" =~ 'An error occurred (NoSuchBucket)' ]]; then
+  elif [[ "${aws_bucket_ls}" == *"An error occurred (NoSuchBucket)"* ]]; then
     log err "AWS S3 bucket '${aws_bucket}' does not exist."
     return 1
   fi
@@ -164,7 +170,9 @@ function check_aws_access {
 
 function check_incomplete_uploads {
   local aws_bucket=$1
-  local incomplete_uploads=$( ${AWS} s3api list-multipart-uploads --bucket "${aws_bucket}" | ${JQ} '.Uploads | length > 0' )
+
+  local incomplete_uploads=""
+  incomplete_uploads=$( ${AWS} s3api list-multipart-uploads --bucket "${aws_bucket}" | ${JQ} '.Uploads | length > 0' )
 
   if [[ "${incomplete_uploads}" == "true" ]]; then
     log warn "Found incomplete multipart uploads in AWS S3 bucket '${aws_bucket}'. Consider reviewing or cleaning up."
