@@ -34,9 +34,12 @@ readonly YELLOW='\033[0;33m'
 # from the deletion process to prevent the removal of recent backups.
 # This threshold is set to 7 days by default.
 readonly SKIP_DAYS=7
-readonly CURRENT_DATE=$(date +%s)
 
-readonly ZFS=$(command -v zfs)
+CURRENT_DATE=$(date +%s)
+readonly CURRENT_DATE
+
+ZFS=$(command -v zfs)
+readonly ZFS
 
 if [[ -z "$ZFS" ]]; then
   echo -e "${RED}Missing required binary: zfs${NC}"
@@ -70,7 +73,7 @@ while IFS=$'\t' read -r snapshot; do
   creation_date=$(${ZFS} get -Hp -o value creation "${snapshot}")
   age=$(( (CURRENT_DATE - creation_date) / 86400 ))  # Age in days
 
-  if (( age <= ${SKIP_DAYS} )); then
+  if (( age <= SKIP_DAYS )); then
     printf "${GREEN}%-${name_width}s${NC} %s\n" "$snapshot" "(created within the last ${SKIP_DAYS} days)"
     continue
   fi

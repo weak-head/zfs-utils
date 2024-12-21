@@ -15,8 +15,9 @@ set -o pipefail
 #   This marks the `odin/services/cloud` dataset for replication to `thor/services/cloud`.
 readonly META_REPLICATION_TARGET="zfs-utils:replication-target"
 
-readonly PV=$(command -v pv)
-readonly ZFS=$(command -v zfs)
+PV=$(command -v pv)
+ZFS=$(command -v zfs)
+readonly PV ZFS
 
 function log {
   local level=$1; shift
@@ -36,10 +37,12 @@ function capture_errors {
 function replicate_dataset {
   local source_dataset=$1
   local target_dataset=$2
-
   local base_snapshot=""
-  local source_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${source_dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
-  local target_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${target_dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
+  local source_snapshot=""
+  local target_snapshot=""
+
+  source_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${source_dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
+  target_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${target_dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
 
   if [[ -z "${source_snapshot}" ]]; then
     log err "Replication aborted: No snapshots found for source dataset '${source_dataset}'."
@@ -69,11 +72,12 @@ function replicate_dataset {
 function replicate_full {
   local source_snapshot=$1
   local target_dataset=$2
+  local snapshot_size=""
 
-  local snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${source_snapshot}" | awk '/size/ {print $2}' )
+  snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${source_snapshot}" | awk '/size/ {print $2}' )
 
   log info "Initiating full replication of snapshot '${source_snapshot}'" \
-           "to dataset '${target_dataset}' (size: $(bytes_to_human ${snapshot_size}))."
+           "to dataset '${target_dataset}' (size: $(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cp "${source_snapshot}" \
         | ${PV} -s "${snapshot_size}" \
@@ -86,11 +90,12 @@ function replicate_incr {
   local base_snapshot=$1
   local change_snapshot=$2
   local target_dataset=$3
-
-  local snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${base_snapshot}" "${change_snapshot}" | awk '/size/ {print $2}' )
+  local snapshot_size=""
+  
+  snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${base_snapshot}" "${change_snapshot}" | awk '/size/ {print $2}' )
 
   log info "Initiating incremental replication from snapshot '${base_snapshot}'" \
-           "to '${change_snapshot}' for dataset '${target_dataset}' (size: $(bytes_to_human ${snapshot_size}))."
+           "to '${change_snapshot}' for dataset '${target_dataset}' (size: $(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cpi "${base_snapshot}" "${change_snapshot}" \
         | ${PV} -s "${snapshot_size}" \

@@ -14,7 +14,8 @@ set -o pipefail
 # This command designates the `odin/services/cloud` dataset for automatic snapshots.
 readonly META_AUTO_SNAP="zfs-utils:auto-snap"
 
-readonly ZFS=$(command -v zfs)
+ZFS=$(command -v zfs)
+readonly ZFS
 
 function log {
   local level=$1; shift
@@ -32,8 +33,7 @@ function capture_errors {
 }
 
 function create_snapshot {
-  local dataset=$1
-  local label=$2
+  local dataset=$1 label=$2
 
   # Verify if the requested snapshot already exists
   if ${ZFS} list -Ht snap -o name | grep -q "^${dataset}@${label}$"; then

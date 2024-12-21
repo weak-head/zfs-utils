@@ -59,7 +59,8 @@ function get_upload_status {
 function set_upload_status {
   local aws_bucket=$1 aws_key=$2 status=$3
 
-  ${AWS} s3api put-object-tagging --bucket "${aws_bucket}" --key "${aws_key}" \
+  ${AWS} s3api put-object-tagging \
+    --bucket "${aws_bucket}" --key "${aws_key}" \
     --tagging "{\"TagSet\":[{\"Key\":\"${AWS_TAG_UPLOAD_STATUS}\",\"Value\":\"${status}\"}]}" \
     > >(capture_errors) 2>&1
 }
@@ -67,7 +68,7 @@ function set_upload_status {
 function upload {
   local dataset=$1 aws_bucket=$2
   local aws_directory="${dataset//\//.}"
-
+  local upload_status=""
   local synced_snapshot=""
   local latest_snapshot=""
   local latest_uploaded=""
@@ -81,7 +82,6 @@ function upload {
   fi
 
   if [[ -n "${latest_uploaded}" ]]; then
-    local upload_status=""
     upload_status=$(get_upload_status "${aws_bucket}" "${aws_directory}/${latest_uploaded}")
 
     if [[ "${upload_status}" == "success" ]]; then
@@ -109,7 +109,6 @@ function upload {
 
 function upload_full {
   local snapshot=$1 aws_bucket=$2 aws_directory=$3
-
   local aws_filename=""
   local snapshot_size=""
 
@@ -132,7 +131,6 @@ function upload_full {
 
 function upload_incr {
   local synced_snapshot=$1 latest_snapshot=$2 aws_bucket=$3 aws_directory=$4
-
   local aws_filename=""
   local snapshot_size=""
 
@@ -155,8 +153,8 @@ function upload_incr {
 
 function check_aws_access {
   local aws_bucket=$1
-
   local aws_bucket_ls=""
+
   aws_bucket_ls=$( ${AWS} s3 ls "${aws_bucket}" 2>&1 )
 
   if [[ "${aws_bucket_ls}" == *"An error occurred (AccessDenied)"* ]]; then
@@ -170,8 +168,8 @@ function check_aws_access {
 
 function check_incomplete_uploads {
   local aws_bucket=$1
-
   local incomplete_uploads=""
+
   incomplete_uploads=$( ${AWS} s3api list-multipart-uploads --bucket "${aws_bucket}" | ${JQ} '.Uploads | length > 0' )
 
   if [[ "${incomplete_uploads}" == "true" ]]; then
