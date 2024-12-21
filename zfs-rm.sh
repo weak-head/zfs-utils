@@ -88,7 +88,7 @@ while IFS=$'\t' read -r snapshot; do
 done <<< "${snapshots}"
 echo ""
 
-if [[ -z "${removals[@]}" ]]; then
+if [[ ${#removals[@]} -eq 0 ]]; then
   echo -e "${YELLOW}No snapshots meet the criteria for deletion. Exiting.${NC}"
   exit 1
 fi
@@ -99,7 +99,7 @@ for snapshot in "${removals[@]}"; do
 done
 
 echo ""
-read -p "Are you sure you want to proceed with the deletion of the above snapshots? (y/n): " choice
+read -r -p "Are you sure you want to proceed with the deletion of the above snapshots? (y/n): " choice
 case "${choice}" in 
   y|Y ) echo -e "Proceeding with deletion...";;
   n|N ) echo -e "${RED}Operation cancelled. No changes made.${NC}"; exit 1;;
@@ -108,7 +108,7 @@ esac
 
 echo ""
 echo "Initiating the deletion of the following snapshots:"
-name_width=$( awk -v pad=8 '{ if (length($0) > max) max = length($0) } END { print max + pad }' <<< "${removals}" )
+name_width=$(printf "%s\n" "${removals[@]}" | awk -v pad=8 '{ if (length($0) > max) max = length($0) } END { print max + pad }')
 for snapshot in "${removals[@]}"; do
   printf "${RED}%-${name_width}s${NC} %s\n" "$snapshot" "(destroying)"
   if ! ${ZFS} destroy "${snapshot}"; then
