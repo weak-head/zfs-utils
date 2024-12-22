@@ -1,16 +1,33 @@
-PREFIX := /usr/local
+SBIN_DIR    := $(DESTDIR)/usr/local/sbin
+CRON_FILE   := /etc/cron.d/zfs-utils
+SCRIPTS     := \
+	zfs-clear.sh \
+	zfs-snap.sh \
+	zfs-to-s3.sh \
+	zfs-to-zfs.sh
+
+.PHONY: all install install-cron uninstall uninstall-cron
 
 all:
 
 install:
-	install -d $(DESTDIR)$(PREFIX)/sbin
-	install zfs-clear.sh   $(DESTDIR)$(PREFIX)/sbin/zfs-clear
-	install zfs-snap.sh    $(DESTDIR)$(PREFIX)/sbin/zfs-snap
-	install zfs-to-s3.sh   $(DESTDIR)$(PREFIX)/sbin/zfs-to-s3
-	install zfs-to-zfs.sh  $(DESTDIR)$(PREFIX)/sbin/zfs-to-zfs
+	@echo "Installing scripts to '$(SBIN_DIR)'..."
+	@install -d $(SBIN_DIR)
+	@for script in $(SCRIPTS); do \
+		install $$script $(SBIN_DIR)/$${script%.sh}; \
+	done
+
+install-cron:
+	@echo "Installing cron job..."
+	@install -D cron.d/zfs-utils $(CRON_FILE)
 
 uninstall:
-	rm $(DESTDIR)$(PREFIX)/sbin/zfs-snap
-	rm $(DESTDIR)$(PREFIX)/sbin/zfs-clear
-	rm $(DESTDIR)$(PREFIX)/sbin/zfs-to-s3
-	rm $(DESTDIR)$(PREFIX)/sbin/zfs-to-zfs
+	@echo "Uninstalling scripts from '$(SBIN_DIR)'..."
+	@for script in $(SCRIPTS); do \
+		rm -f $(SBIN_DIR)/$${script%.sh}; \
+	done
+
+uninstall-cron:
+	@echo "Uninstalling cron job..."
+	@rm -f $(CRON_FILE)
+
