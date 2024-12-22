@@ -1,0 +1,8 @@
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# At 01:00 on day-of-month 1 => create ZFS snapshots
+0 1 1 * * root zfs-snap
+
+# At 02:00 on day-of-month 1 => upload ZFS snapshots to AWS S3
+0 2 1 * * root zfs-to-s3
+
