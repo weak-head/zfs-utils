@@ -5,6 +5,8 @@
 set -o nounset
 set -o pipefail
 
+# readonly VERSION="v0.1.0"
+
 # Custom ZFS metadata property to mark datasets for automatic snapshots.
 # To enable automatic snapshotting for a dataset, set this property to 'true'.
 #

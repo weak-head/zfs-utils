@@ -6,6 +6,8 @@
 set -o nounset
 set -o pipefail
 
+# readonly VERSION="v0.1.0"
+
 # Custom ZFS metadata property used to specify the target dataset for replication.
 # To mark a dataset for replication, set the custom property to the target dataset name.
 #

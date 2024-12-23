@@ -9,6 +9,8 @@
 set -o nounset
 set -o pipefail
 
+# readonly VERSION="v0.1.0"
+
 # This custom ZFS metadata property specifies the AWS S3 bucket 
 # designated for storing dataset backups. To enable AWS S3 backups 
 # for a dataset, set this custom property to the target bucket name.
