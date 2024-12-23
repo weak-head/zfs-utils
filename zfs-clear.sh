@@ -23,7 +23,7 @@
 #   This command will identify and prompt for the deletion of snapshots containing either "2024-10" or "2023" 
 #   in their names, while automatically preserving recent snapshots and the latest snapshot of each dataset.
 
-readonly VERSION="v0.1.0"
+# readonly VERSION="v0.1.0"
 
 # Color codes for pretty print
 readonly NC='\033[0m' # No Color
