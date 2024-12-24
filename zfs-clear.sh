@@ -11,7 +11,7 @@
 #   a confirmation prompt before any deletions take place.
 #
 # Usage Instructions:
-#   $> zfs-rm <pattern1> <pattern2> ... <patternN>
+#   $> zfs-clear <pattern1> <pattern2> ... <patternN>
 #
 # Parameters:
 #   pattern1, pattern2, ... patternN - One or more strings used to filter snapshot names. Only snapshots that 
@@ -19,17 +19,27 @@
 #                                      additional criteria.
 #
 # Example Command:
-#   $> zfs-rm 2024-10 2023 
+#   $> zfs-clear 2024-10 2023 
 #   This command will identify and prompt for the deletion of snapshots containing either "2024-10" or "2023" 
 #   in their names, while automatically preserving recent snapshots and the latest snapshot of each dataset.
-
-# readonly VERSION="v0.1.0"
 
 # Color codes for pretty print
 readonly NC='\033[0m' # No Color
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
+declare -A COLORS=(
+    # -- print usage
+    [TITLE]='\033[0;36m'        # Cyan
+    [TEXT]='\033[0;37m'         # White
+    [CMD]='\033[0;34m'          # Blue
+    [ARGS]='\033[0;35m'         # Magenta
+    # -- message severity
+    #[INFO]='\033[0;36mℹ️ '       # Cyan
+    #[WARN]='\033[0;33m⚡ '      # Yellow
+    #[ERROR]='\033[0;31m❌ '     # Red
+    #[SUCCESS]='\033[0;32m✅ '   # Green
+)
 
 # Snapshots created within the specified number of days will be excluded
 # from the deletion process to prevent the removal of recent backups.
@@ -41,6 +51,34 @@ readonly CURRENT_DATE
 
 ZFS=$(command -v zfs)
 readonly ZFS
+
+function print_usage {
+  local VERSION="v0.2.0"
+
+  echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Usage:${NC}"
+  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC} ${COLORS[ARGS]}<pattern1> <pattern2> ... <patternN>${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Arguments:${NC}"
+  echo -e "  ${COLORS[ARGS]}<pattern1> <pattern2> ... <patternN>${NC}"
+  echo -e "      One or more strings used to filter snapshot names."
+  echo -e "      Only snapshots that match any provided patterns will be considered for deletion,"
+  echo -e "      provided they meet additional criteria."
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Examples:${NC}"
+  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC} ${COLORS[ARGS]}2024-10 2023${NC}"
+  echo -e "      This command will identify and prompt for the deletion of snapshots containing either '2024-10' or '2023'"
+  echo -e "      in their names, while automatically preserving recent snapshots and the latest snapshot of each dataset."
+  echo -e ""
+}
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --help) print_usage; exit 0 ;;
+    *) break ;;
+  esac
+done
 
 if [[ -z "$ZFS" ]]; then
   echo -e "${RED}Missing required binary: zfs${NC}"
