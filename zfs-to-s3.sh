@@ -9,8 +9,6 @@
 set -o nounset
 set -o pipefail
 
-# readonly VERSION="v0.1.0"
-
 # This custom ZFS metadata property specifies the AWS S3 bucket 
 # designated for storing dataset backups. To enable AWS S3 backups 
 # for a dataset, set this custom property to the target bucket name.
@@ -30,11 +28,49 @@ readonly AWS_META_SNAPSHOT_NAME="snapshot-name"
 readonly AWS_META_SNAPSHOT_BASE="snapshot-base"
 readonly AWS_META_SNAPSHOT_KIND="snapshot-kind"
 
+# Color codes for pretty print
+readonly NC='\033[0m' # No Color
+declare -A COLORS=(
+  [TITLE]='\033[0;36m'  # Cyan
+  [TEXT]='\033[0;37m'   # White
+  [CMD]='\033[0;34m'    # Blue
+  [ARGS]='\033[0;35m'   # Magenta
+)
+
 JQ=$(command -v jq)
 PV=$(command -v pv)
 ZFS=$(command -v zfs)
 AWS=$(command -v aws)
 readonly JQ PV ZFS AWS
+
+function print_usage {
+  local VERSION="v0.2.0"
+
+  echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Usage:${NC}"
+  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Description:${NC}"
+  echo -e "  This script automates the backup of ZFS datasets to AWS S3."
+  echo -e "  It uses custom ZFS metadata properties to specify the AWS S3 bucket"
+  echo -e "  for backups, providing both full and incremental backup capabilities."
+  echo -e ""
+  echo -e "  Dataset snapshots could be restored directly from AWS S3 bucket:"
+  echo -e "  $> ${COLORS[CMD]}aws s3 cp s3://bucket/directory/file - | pv | zfs recv odin/services/cloud${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}ZFS Metadata:${NC}"
+  echo -e "  ${COLORS[ARGS]}zfs-utils:aws-bucket${NC}"
+  echo -e "    This custom ZFS metadata property specifies the AWS S3 bucket"
+  echo -e "    designated for storing dataset backups. To enable AWS S3 backups"
+  echo -e "    for a dataset, set this custom property to the target bucket name."
+  echo -e ""
+  echo -e "    Example:"
+  echo -e "    $> ${COLORS[CMD]}zfs set zfs-utils:aws-bucket=backup.bucket.aws odin/services/cloud${NC}"
+  echo -e "      This command marks the 'odin/services/cloud' dataset for AWS S3 backups,"
+  echo -e "      and specifies 'backup.bucket.aws' as the backup destination."
+  echo -e ""
+}
 
 function log {
   local level=$1; shift
@@ -193,6 +229,13 @@ function bytes_to_human {
 
   echo "${bytes}${decimal_part} ${suffixes[${suffix_index}]}"
 }
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --help) print_usage; exit 0 ;;
+    *) break ;;
+  esac
+done
 
 if [[ -z "${ZFS}" || -z "${PV}" || -z "${AWS}" || -z "${JQ}" ]]; then
   log err "Missing required binaries: zfs, pv, aws, jq."
