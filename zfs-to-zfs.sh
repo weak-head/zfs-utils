@@ -6,8 +6,6 @@
 set -o nounset
 set -o pipefail
 
-# readonly VERSION="v0.1.0"
-
 # Custom ZFS metadata property used to specify the target dataset for replication.
 # To mark a dataset for replication, set the custom property to the target dataset name.
 #
@@ -17,9 +15,42 @@ set -o pipefail
 #   This marks the `odin/services/cloud` dataset for replication to `thor/services/cloud`.
 readonly META_REPLICATION_TARGET="zfs-utils:replication-target"
 
+# Color codes for pretty print
+readonly NC='\033[0m' # No Color
+declare -A COLORS=(
+  [TITLE]='\033[0;36m'  # Cyan
+  [TEXT]='\033[0;37m'   # White
+  [CMD]='\033[0;34m'    # Blue
+  [ARGS]='\033[0;35m'   # Magenta
+)
+
 PV=$(command -v pv)
 ZFS=$(command -v zfs)
 readonly PV ZFS
+
+function print_usage {
+  local VERSION="v0.2.0"
+
+  echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Usage:${NC}"
+  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Description:${NC}"
+  echo -e "  This script automates the replication of ZFS datasets across different pools."
+  echo -e "  It utilizes custom ZFS metadata properties to identify source and target datasets"
+  echo -e "  for replication, and provides full and incremental replication functionalities."
+  echo -e ""
+  echo -e "${COLORS[TITLE]}ZFS Metadata:${NC}"
+  echo -e "  ${COLORS[ARGS]}zfs-utils:replication-target${NC}"
+  echo -e "    Custom ZFS metadata property used to specify the target dataset for replication."
+  echo -e "    To mark a dataset for replication, set the custom property to the target dataset name."
+  echo -e ""
+  echo -e "    Example:"
+  echo -e "      $> ${COLORS[CMD]}zfs set zfs-utils:replication-target=thor/services/cloud odin/services/cloud${NC}"
+  echo -e "      This marks the 'odin/services/cloud' dataset for replication to 'thor/services/cloud'."
+  echo -e ""
+}
 
 function log {
   local level=$1; shift
@@ -120,6 +151,13 @@ function bytes_to_human {
 
   echo "${bytes}${decimal_part} ${suffixes[${suffix_index}]}"
 }
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --help) print_usage; exit 0 ;;
+    *) break ;;
+  esac
+done
 
 if [[ -z "${ZFS}" || -z "${PV}" ]]; then
   log err "Missing required binaries: zfs, pv."
