@@ -137,8 +137,8 @@ done
 echo ""
 read -r -p "Are you sure you want to proceed with the deletion of the above snapshots? (y/n): " choice
 case "${choice}" in 
-  y|Y ) echo -e "Proceeding with deletion...";;
-  n|N ) echo -e "${COLORS[ERROR]}Operation cancelled. No changes made.${NC}"; exit 1;;
+  y|Y ) echo -e "${COLORS[SUCCESS]}Proceeding with deletion...${NC}";;
+  n|N ) echo -e "${COLORS[WARN]}Operation cancelled. No changes made.${NC}"; exit 1;;
   * ) echo -e "${COLORS[ERROR]}Invalid input. Please enter 'y' or 'n'. Exiting.${NC}"; exit 1;;
 esac
 
@@ -149,5 +149,9 @@ for snapshot in "${removals[@]}"; do
   printf "${COLORS[INFO]}%-${name_width}s${NC} %s\n" "$snapshot" "(destroying)"
   if ! ${ZFS} destroy "${snapshot}"; then
     echo -e "${COLORS[ERROR]}Error: Failed to destroy ${snapshot}${NC}\n"
+  else
+    echo -e "${COLORS[SUCCESS]}Destroyed ${snapshot}${NC}\n"
   fi
 done
+
+echo ""
