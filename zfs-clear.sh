@@ -104,7 +104,9 @@ fi
 removals=()
 name_width=$( awk -v pad=4 '{ if (length($0) > max) max = length($0) } END { print max + pad }' <<< "${snapshots}" )
 
-echo "The following snapshots match the pattern, but are excluded from the deletion:"
+echo -e ""
+echo -e "Snapshots excluded from the deletion:"
+echo -e "-----------------------------------------"
 while IFS=$'\t' read -r snapshot; do
   creation_date=$(${ZFS} get -Hp -o value creation "${snapshot}")
   age=$(( (CURRENT_DATE - creation_date) / 86400 ))  # Age in days
@@ -122,19 +124,22 @@ while IFS=$'\t' read -r snapshot; do
 
   removals+=("${snapshot}")
 done <<< "${snapshots}"
-echo ""
 
+echo -e ""
 if [[ ${#removals[@]} -eq 0 ]]; then
   echo -e "${COLORS[WARN]}No snapshots meet the criteria for deletion. Exiting.${NC}"
   exit 1
 fi
 
-echo "The following snapshots are eligible for deletion:"
+echo -e "Snapshots eligible for deletion:"
+echo -e "-----------------------------------------"
 for snapshot in "${removals[@]}"; do
   echo -e "${COLORS[WARN]}${snapshot}${NC}"
 done
 
-echo ""
+echo -e ""
+echo -e "Confirming snapshot removals..."
+echo -e "-----------------------------------------"
 read -r -p "Are you sure you want to proceed with the deletion of the above snapshots? (y/n): " choice
 case "${choice}" in 
   y|Y ) echo -e "${COLORS[SUCCESS]}Proceeding with deletion...${NC}";;
@@ -142,16 +147,16 @@ case "${choice}" in
   * ) echo -e "${COLORS[ERROR]}Invalid input. Please enter 'y' or 'n'. Exiting.${NC}"; exit 1;;
 esac
 
-echo ""
-echo "Initiating the deletion of the following snapshots:"
-name_width=$(printf "%s\n" "${removals[@]}" | awk -v pad=8 '{ if (length($0) > max) max = length($0) } END { print max + pad }')
+echo -e ""
+echo -e "Deleting snapshots..."
+echo -e "-----------------------------------------"
 for snapshot in "${removals[@]}"; do
-  printf "${COLORS[INFO]}%-${name_width}s${NC} %s\n" "$snapshot" "(destroying)"
+  echo -e "${COLORS[INFO]}Deleting '${snapshot}'...${NC}"
   if ! ${ZFS} destroy "${snapshot}"; then
-    echo -e "${COLORS[ERROR]}Error: Failed to destroy ${snapshot}${NC}\n"
+    echo -e "${COLORS[ERROR]}Error: Failed to delete '${snapshot}'${NC}\n"
   else
-    echo -e "${COLORS[SUCCESS]}Destroyed ${snapshot}${NC}\n"
+    echo -e "${COLORS[SUCCESS]}Removed '${snapshot}'${NC}\n"
   fi
 done
 
-echo ""
+echo -e ""
