@@ -31,6 +31,9 @@ declare -A COLORS=(
     [TEXT]='\033[0;37m'         # White
     [CMD]='\033[0;34m'          # Blue
     [ARGS]='\033[0;35m'         # Magenta
+    # -- operation log
+    [SECTION]='\033[1;32m'      # Green (bold)
+    [ACTION]='\033[0;34m⏳ '    # Blue
     # -- message severity
     [INFO]='\033[0;36mℹ️ '       # Cyan
     [WARN]='\033[0;33m⚡ '      # Yellow
@@ -78,35 +81,38 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [[ -z "$ZFS" ]]; then
-  echo -e "${COLORS[ERROR]}Missing required binary: zfs${NC}"
+  echo -e "${COLORS[ERROR]}Missing required binary: zfs\n${NC}"
   exit 1
 fi
 
 if [[ $# -eq 0 ]]; then
-  echo -e "${COLORS[ERROR]}Error: No snapshot filter provided. Please specify at least one filter pattern.${NC}"
+  echo -e "${COLORS[ERROR]}Error: No snapshot filter provided. Please specify at least one filter pattern.\n${NC}"
   exit 1
 fi
 
 params=("$@")
 for pattern in "${params[@]}"; do
   if [[ -z "${pattern}" || "${pattern}" =~ ^[[:space:]]*$ ]]; then
-    echo -e "${COLORS[ERROR]}Error: Snapshot filter cannot be an empty string. Please provide valid patterns.${NC}"
+    echo -e "${COLORS[ERROR]}Error: Snapshot filter cannot be an empty string. Please provide valid patterns.\n${NC}"
     exit 1
   fi
 done
 
+# Snapshots that match ANY of the specified patterns
 snapshots=$(${ZFS} list -rH -t snapshot -o name | grep -E "$(IFS="|"; echo "${params[*]}")")
+
+# Snapshots marked for deletion
+removals=()
+
 if [[ -z "${snapshots}" ]]; then
-  echo -e "${COLORS[WARN]}Warning: No matching snapshots found for the specified patterns. Exiting.${NC}"
+  echo -e "${COLORS[WARN]}Warning: No matching snapshots found for the specified patterns. Exiting.\n${NC}"
   exit 1
 fi
 
-removals=()
-name_width=$( awk -v pad=4 '{ if (length($0) > max) max = length($0) } END { print max + pad }' <<< "${snapshots}" )
-
 echo -e ""
-echo -e "Snapshots excluded from the deletion:"
+echo -e "${COLORS[SECTION]}Snapshots excluded from the deletion:${NC}"
 echo -e "-----------------------------------------"
+name_width=$( awk -v pad=4 '{ if (length($0) > max) max = length($0) } END { print max + pad }' <<< "${snapshots}" )
 while IFS=$'\t' read -r snapshot; do
   creation_date=$(${ZFS} get -Hp -o value creation "${snapshot}")
   age=$(( (CURRENT_DATE - creation_date) / 86400 ))  # Age in days
@@ -125,33 +131,33 @@ while IFS=$'\t' read -r snapshot; do
   removals+=("${snapshot}")
 done <<< "${snapshots}"
 
-echo -e ""
 if [[ ${#removals[@]} -eq 0 ]]; then
-  echo -e "${COLORS[WARN]}No snapshots meet the criteria for deletion. Exiting.${NC}"
+  echo -e "\n${COLORS[WARN]}No snapshots meet the criteria for deletion. Exiting.\n${NC}"
   exit 1
 fi
 
-echo -e "Snapshots eligible for deletion:"
+echo -e ""
+echo -e "${COLORS[SECTION]}Snapshots eligible for deletion:${NC}"
 echo -e "-----------------------------------------"
 for snapshot in "${removals[@]}"; do
   echo -e "${COLORS[WARN]}${snapshot}${NC}"
 done
 
 echo -e ""
-echo -e "Confirming snapshot removals..."
+echo -e "${COLORS[SECTION]}Confirming snapshot removals...${NC}"
 echo -e "-----------------------------------------"
-read -r -p "Are you sure you want to proceed with the deletion of the above snapshots? (y/n): " choice
+read -r -p "Are you sure you want to delete the above snapshots? (y/n): " choice
 case "${choice}" in 
   y|Y ) echo -e "${COLORS[SUCCESS]}Proceeding with deletion...${NC}";;
-  n|N ) echo -e "${COLORS[WARN]}Operation cancelled. No changes made.${NC}"; exit 1;;
-  * ) echo -e "${COLORS[ERROR]}Invalid input. Please enter 'y' or 'n'. Exiting.${NC}"; exit 1;;
+  n|N ) echo -e "${COLORS[WARN]}Operation cancelled. No changes made.\n${NC}"; exit 1;;
+  * ) echo -e "${COLORS[ERROR]}Invalid input. Please enter 'y' or 'n'. Exiting.\n${NC}"; exit 1;;
 esac
 
 echo -e ""
-echo -e "Deleting snapshots..."
+echo -e "${COLORS[SECTION]}Deleting snapshots...${NC}"
 echo -e "-----------------------------------------"
 for snapshot in "${removals[@]}"; do
-  echo -e "${COLORS[INFO]}Deleting '${snapshot}'...${NC}"
+  echo -e "${COLORS[ACTION]}Deleting '${snapshot}'...${NC}"
   if ! ${ZFS} destroy "${snapshot}"; then
     echo -e "${COLORS[ERROR]}Error: Failed to delete '${snapshot}'${NC}\n"
   else
@@ -159,4 +165,3 @@ for snapshot in "${removals[@]}"; do
   fi
 done
 
-echo -e ""
