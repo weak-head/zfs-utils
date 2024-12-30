@@ -17,10 +17,14 @@ readonly META_AUTO_SNAP="zfs-utils:auto-snap"
 # Color codes for pretty print
 readonly NC='\033[0m' # No Color
 declare -A COLORS=(
-  [TITLE]='\033[0;36m'  # Cyan
-  [TEXT]='\033[0;37m'   # White
-  [CMD]='\033[0;34m'    # Blue
-  [ARGS]='\033[0;35m'   # Magenta
+  [TITLE]='\033[0;36m'      # Cyan
+  [TEXT]='\033[0;37m'       # White
+  [CMD]='\033[0;34m'        # Blue
+  [ARGS]='\033[0;35m'       # Magenta
+  # -- message severity
+  [INFO]='\033[0;36mℹ️ '     # Cyan
+  [WARN]='\033[0;33m⚡ '    # Yellow
+  [ERROR]='\033[0;31m❌ '   # Red
 )
 
 ZFS=$(command -v zfs)
@@ -49,9 +53,9 @@ function print_usage {
 function log {
   local level=$1; shift
   case $level in
-    (err*) logger -t "zfs-snap" -p "user.err" "$*"; echo "Error: $*" 1>&2 ;;
-    (war*) logger -t "zfs-snap" -p "user.warning" "$*"; echo "Warning: $*" 1>&2 ;;
-    (inf*) logger -t "zfs-snap" -p "user.info" "$*"; echo "$*" ;;
+    (err*) logger -t "zfs-snap" -p "user.err" "$*"; echo -e "${COLORS[ERROR]}Error: $*${NC}" 2>&2 ;;
+    (war*) logger -t "zfs-snap" -p "user.warning" "$*"; echo -e "${COLORS[WARN]}Warning: $*${NC}" 1>&2 ;;
+    (inf*) logger -t "zfs-snap" -p "user.info" "$*"; echo -e "${COLORS[INFO]}$*${NC}" ;;
   esac
 }
 
@@ -92,8 +96,8 @@ fi
 
 # Generate an ISO 8601 date label (YYYY-MM-DD) to be used as the snapshot identifier.
 # This label will be applied to all snapshots created in this run.
-# Example: The resulting snapshot name will be in the format:
-#   <dataset>@<date>, such as odin/services/cloud@2024-10-21
+# The resulting snapshot name will be in the format: <dataset>@<date>
+# Such as 'odin/services/cloud@2024-10-21'.
 label=$(date -u +'%Y-%m-%d')
 
 # List all ZFS datasets recursively, including their custom auto-snapshot property.

@@ -35,6 +35,10 @@ declare -A COLORS=(
   [TEXT]='\033[0;37m'   # White
   [CMD]='\033[0;34m'    # Blue
   [ARGS]='\033[0;35m'   # Magenta
+  # -- message severity
+  [INFO]='\033[0;36mℹ️ '     # Cyan
+  [WARN]='\033[0;33m⚡ '    # Yellow
+  [ERROR]='\033[0;31m❌ '   # Red
 )
 
 JQ=$(command -v jq)
@@ -75,9 +79,9 @@ function print_usage {
 function log {
   local level=$1; shift
   case $level in
-    (err*) logger -t "zfs-aws" -p "user.err" "$*"; echo "Error: $*" 1>&2 ;;
-    (war*) logger -t "zfs-aws" -p "user.warning" "$*"; echo "Warning: $*" 1>&2 ;;
-    (inf*) logger -t "zfs-aws" -p "user.info" "$*"; echo "$*" ;;
+    (err*) logger -t "zfs-to-s3" -p "user.err" "$*"; echo -e "${COLORS[ERROR]}Error: $*${NC}" 2>&2 ;;
+    (war*) logger -t "zfs-to-s3" -p "user.warning" "$*"; echo -e "${COLORS[WARN]}Warning: $*${NC}" 1>&2 ;;
+    (inf*) logger -t "zfs-to-s3" -p "user.info" "$*"; echo -e "${COLORS[INFO]}$*${NC}" ;;
   esac
 }
 
