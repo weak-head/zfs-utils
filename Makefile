@@ -1,6 +1,7 @@
 SBIN_DIR    := /usr/local/sbin
 CRON_FILE   := /etc/cron.d/zfs-utils
 SCRIPTS     := \
+	zfs-info.sh \
 	zfs-clear.sh \
 	zfs-snap.sh \
 	zfs-to-s3.sh \

@@ -34,13 +34,21 @@ TBD
 
 ## Getting Started
 
-TBD
+Ensure the following dependencies are installed: 
+  - Required for all scripts: `zfs`
+  - Required for `zfs-to-zfs`: `pv`
+  - Required for `zfs-to-s3`: `aws`, `jq`, `pv`
 
-| Script | ZFS Metadata | Example Value | Description |
+The behavior of the scripts is configured using ZFS metadata. This metadata specifies datasets for snapshots, replication targets, or target AWS S3 buckets.
+
+
+| Script | ZFS Metadata Key | Example Value | Description |
 | --- | --- | --- | --- |
 | `zfs-snap` | `zfs-utils:auto-snap` | `true` | Enable automatic snapshots |
 | `zfs-to-s3` | `zfs-utils:aws-bucket` | `backup.bucket.aws` | Enable AWS S3 backups |
 | `zfs-to-zfs` | `zfs-utils:replication-target` | `thor/services/cloud` | Enable dataset replication |
+
+Set the ZFS metadata using the following commands:
 
 ```bash
 # Mark dataset for automatic snapshots
@@ -52,4 +60,12 @@ zfs set zfs-utils:aws-bucket=backup.bucket.aws odin/services/cloud
 # Mark dataset for ZFS replication
 zfs set zfs-utils:replication-target=thor/services/cloud odin/services/cloud
 ```
+
+To list all datasets and their assigned metadata, use the following command:
+
+```bash
+# tbd
+```
+
+This command will display all datasets with metadata keys related to `zfs-utils`.
 
