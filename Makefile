@@ -14,43 +14,43 @@ COLOR_SUCCESS := \033[0;32m
 .PHONY: install install-cron uninstall uninstall-cron
 
 install:
-	@echo -e "Installing to '${COLOR_INFO}${SBIN_DIR}${NC}'"
-	@install -d ${SBIN_DIR} 2>/dev/null || { echo -e "\n${COLOR_ERROR}Failed to create directory: ${SBIN_DIR}${NC}"; exit 1; }
+	@printf "Installing to '${COLOR_INFO}${SBIN_DIR}${NC}'\n"
+	@install -d ${SBIN_DIR} 2>/dev/null || { printf "\n${COLOR_ERROR}Failed to create directory: ${SBIN_DIR}${NC}\n"; exit 1; }
 	@for script in ${SCRIPTS}; do \
 		if install $$script ${SBIN_DIR}/$${script%.sh}; then \
-			echo -e "Installed: ${COLOR_SUCCESS}$${script%.sh}${NC}"; \
+			printf "Installed: ${COLOR_SUCCESS}$${script%.sh}${NC}\n"; \
 		else \
-			echo -e "${COLOR_ERROR}Failed to install: $${script%.sh}${NC}"; \
+			printf "${COLOR_ERROR}Failed to install: $${script%.sh}${NC}\n"; \
 			exit 1; \
 		fi; \
 	done
 
 install-cron:
-	@echo -e "Installing cron to '${COLOR_INFO}${CRON_FILE}${NC}'"
+	@printf "Installing cron to '${COLOR_INFO}${CRON_FILE}${NC}'\n"
 	@if install -D cron.d/zfs-utils "${CRON_FILE}"; then \
-		echo -e "Installed: ${COLOR_SUCCESS}${CRON_FILE}${NC}"; \
+		printf "Installed: ${COLOR_SUCCESS}${CRON_FILE}${NC}\n"; \
 	else \
-	  echo -e "${COLOR_ERROR}Failed to install: ${CRON_FILE}${NC}"; \
+	  printf "${COLOR_ERROR}Failed to install: ${CRON_FILE}${NC}\n"; \
 	  exit 1; \
 	fi
 
 uninstall:
-	@echo -e "Uninstalling from '${COLOR_INFO}${SBIN_DIR}${NC}'"
+	@printf "Uninstalling from '${COLOR_INFO}${SBIN_DIR}${NC}'\n"
 	@for script in ${SCRIPTS}; do \
 		if rm -f "${SBIN_DIR}/$${script%.sh}"; then \
-		  echo -e "Uninstalled: ${COLOR_SUCCESS}$${script%.sh}${NC}"; \
+		  printf "Uninstalled: ${COLOR_SUCCESS}$${script%.sh}${NC}\n"; \
 		else \
-			echo -e "${COLOR_ERROR}Failed to uninstall: $${script%.sh}${NC}"; \
+			printf "${COLOR_ERROR}Failed to uninstall: $${script%.sh}${NC}\n"; \
 			exit 1; \
 		fi; \
 	done
 
 uninstall-cron:
-	@echo -e "Uninstalling cron from '${COLOR_INFO}${CRON_FILE}${NC}'"
+	@printf "Uninstalling cron from '${COLOR_INFO}${CRON_FILE}${NC}'\n"
 	@if rm -f "${CRON_FILE}"; then \
-		echo -e "Uninstalled: ${COLOR_SUCCESS}${CRON_FILE}${NC}"; \
+		printf "Uninstalled: ${COLOR_SUCCESS}${CRON_FILE}${NC}\n"; \
 	else \
-		echo -e "${COLOR_ERROR}Failed to uninstall cron: ${CRON_FILE}${NC}"; \
+		printf "${COLOR_ERROR}Failed to uninstall cron: ${CRON_FILE}${NC}\n"; \
 		exit 1; \
 	fi;
 
