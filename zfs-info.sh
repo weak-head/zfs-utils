@@ -11,22 +11,24 @@ fi
 ${ZFS} get -H \
     -o name,property,value \
     -t filesystem,volume \
-    zfs-utils:auto-snap,zfs-utils:replication-target,zfs-utils:aws-bucket \
-| awk '
+    zfs-utils:auto-snap,zfs-utils:aws-bucket,zfs-utils:replication-target | \
+awk '
 BEGIN { 
-    printf "%-30s %-10s %-30s %-30s\n", "Dataset", "Auto-Snap", "Replication Target", "AWS Bucket"; 
-    print "-------------------------------------------------------------------------------------------------------------"; 
+    header = sprintf("%-30s %-20s %-30s %-30s", "Dataset", "Auto-Snap", "AWS Bucket", "Replication Target"); 
+    separator = "-------------------------------------------------------------------------------------------------------------"; 
+    print header; 
+    print separator; 
 }
 {
     data[$1][$2] = $3
 }
 END {
     for (dataset in data) {
-        printf "%-30s %-10s %-30s %-30s\n", 
+        printf "%-30s %-20s %-30s %-30s\n", 
             dataset, 
-            (data[dataset]["zfs-utils:auto-snap"] ? data[dataset]["zfs-utils:auto-snap"] : "-"), 
-            (data[dataset]["zfs-utils:replication-target"] ? data[dataset]["zfs-utils:replication-target"] : "-"),
-            (data[dataset]["zfs-utils:aws-bucket"] ? data[dataset]["zfs-utils:aws-bucket"] : "-"); 
+            (data[dataset]["zfs-utils:auto-snap"] ? data[dataset]["zfs-utils:auto-snap"] : "N/A"), 
+            (data[dataset]["zfs-utils:aws-bucket"] ? data[dataset]["zfs-utils:aws-bucket"] : "N/A"), 
+            (data[dataset]["zfs-utils:replication-target"] ? data[dataset]["zfs-utils:replication-target"] : "N/A");
     }
-}' | (head -n 2 && tail -n +3 | sort)
+}' | awk 'NR <= 2 {print $0} NR > 2 {print $0 | "sort"}'
 
