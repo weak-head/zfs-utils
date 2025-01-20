@@ -38,11 +38,11 @@ This project includes several scripts, each with specific dependencies. The only
 
 The scripts' behavior is controlled through ZFS metadata, which determines whether actions like snapshots, replication, or AWS S3 backups should be performed.
 
-| Script        | ZFS Metadata Key          | Example Value            | Description                      |
-|---------------|---------------------------|--------------------------|----------------------------------|
-| `zfs-snap`    | `zfs-utils:auto-snap`     | `true`                   | Enables automatic snapshots.    |
-| `zfs-to-s3`   | `zfs-utils:aws-bucket`    | `backup.bucket.aws`      | Enables AWS S3 backups.         |
-| `zfs-to-zfs`  | `zfs-utils:replication-target` | `thor/services/cloud` | Enables dataset replication.    |
+| Script        | ZFS Metadata Key               | Description                     |
+|---------------|--------------------------------|---------------------------------|
+| `zfs-snap`    | `zfs-utils:auto-snap`          | Enables automatic snapshots.    |
+| `zfs-to-s3`   | `zfs-utils:aws-bucket`         | Enables AWS S3 backups.         |
+| `zfs-to-zfs`  | `zfs-utils:replication-target` | Enables dataset replication.    |
 
 You can configure ZFS metadata using the `zfs set` command. Here are some examples:
 
