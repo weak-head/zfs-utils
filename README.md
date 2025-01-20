@@ -34,22 +34,35 @@ TBD
 
 ## Getting Started
 
-TBD
+This project includes several scripts, each with specific dependencies. The only required dependency for all scripts is `zfs`. Additional dependencies, which depend on the script being used, include `pv`, `aws`, and `jq`.
 
-| Script | ZFS Metadata | Example Value | Description |
-| --- | --- | --- | --- |
-| `zfs-snap` | `zfs-utils:auto-snap` | `true` | Enable automatic snapshots |
-| `zfs-to-s3` | `zfs-utils:aws-bucket` | `backup.bucket.aws` | Enable AWS S3 backups |
-| `zfs-to-zfs` | `zfs-utils:replication-target` | `thor/services/cloud` | Enable dataset replication |
+The scripts' behavior is controlled through ZFS metadata, which determines whether actions like snapshots, replication, or AWS S3 backups should be performed.
+
+| Script        | ZFS Metadata Key               | Description                     |
+|---------------|--------------------------------|---------------------------------|
+| `zfs-snap`    | `zfs-utils:auto-snap`          | Enables automatic snapshots.    |
+| `zfs-to-s3`   | `zfs-utils:aws-bucket`         | Enables AWS S3 backups.         |
+| `zfs-to-zfs`  | `zfs-utils:replication-target` | Enables dataset replication.    |
+
+You can configure ZFS metadata using the `zfs set` command. Here are some examples:
 
 ```bash
-# Mark dataset for automatic snapshots
+# Enable automatic snapshots for a dataset
 zfs set zfs-utils:auto-snap=true odin/services/cloud
 
-# Mark dataset for AWS S3 backups
+# Configure AWS S3 backups for a dataset
 zfs set zfs-utils:aws-bucket=backup.bucket.aws odin/services/cloud
 
-# Mark dataset for ZFS replication
+# Define a replication target for a dataset
 zfs set zfs-utils:replication-target=thor/services/cloud odin/services/cloud
 ```
+
+To install the scripts, run:
+
+```bash
+# This installs the scripts to `/usr/local/sbin/` 
+make install
+```
+
+To view all datasets and their associated metadata, use the `zfs-info` command.
 
