@@ -131,7 +131,7 @@ function gen_key {
   local timestamp=""
 
   zfs_label="${zfs_snapshot##*@}"
-  timestamp=$( date '+%Y%m%d%H%M%S' )
+  timestamp=$( date '+%Y-%m-%d_%H-%M-%S' )
 
   echo "${aws_directory}/${timestamp}_${zfs_label}_${custom_label}"
 }
