@@ -123,12 +123,15 @@ function get_meta {
     | ${JQ} -r ".Metadata[\"${meta_key}\"]"
 }
 
-function gen_name {
-  local snapshot=$1 
-  local tag=$2
-  local label="${snapshot##*@}"
+function gen_key {
+  local zfs_snapshot=$1
+  local aws_directory=$2
+  local custom_label=$3
+  local zfs_label
 
-  echo "${label}_${tag}"
+  zfs_label="${zfs_snapshot##*@}"
+
+  echo "${aws_directory}/${zfs_label}_${custom_label}"
 }
 
 function upload {
@@ -182,24 +185,24 @@ function upload_full {
   local snapshot=$1
   local aws_bucket=$2
   local aws_directory=$3
-  local aws_filename=""
-  local snapshot_size=""
+  local aws_key
+  local snapshot_size
 
-  aws_filename=$( gen_name "${snapshot}" "full" )
+  aws_key=$( gen_key "${snapshot}" "${aws_directory}" "full" )
   snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${snapshot}" | awk '/size/ {print $2}' )
   
-  log info "Full upload '${snapshot}' to 's3://${aws_bucket}/${aws_directory}/${aws_filename}' ($(bytes_to_human "${snapshot_size}"))."
+  log info "Full upload '${snapshot}' to 's3://${aws_bucket}/${aws_key}' ($(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cp "${snapshot}" \
         | ${PV} -s "${snapshot_size}" \
-        | ${AWS} s3 cp - "s3://${aws_bucket}/${aws_directory}/${aws_filename}" \
+        | ${AWS} s3 cp - "s3://${aws_bucket}/${aws_key}" \
           --expected-size "${snapshot_size}" \
           --metadata "${AWS_META_SNAPSHOT_NAME}=${snapshot},${AWS_META_SNAPSHOT_KIND}=full" \
           > >(capture_errors) 2>&1; then
     return 1
   fi
 
-  set_tag "${aws_bucket}" "${aws_directory}/${aws_filename}" "${AWS_TAG_UPLOAD_STATUS}" "${STATUS_SUCCESS}"
+  set_tag "${aws_bucket}" "${aws_key}" "${AWS_TAG_UPLOAD_STATUS}" "${STATUS_SUCCESS}"
 }
 
 function upload_incr {
@@ -207,24 +210,24 @@ function upload_incr {
   local latest_snapshot=$2
   local aws_bucket=$3
   local aws_directory=$4
-  local aws_filename=""
-  local snapshot_size=""
+  local aws_key
+  local snapshot_size
 
-  aws_filename=$( gen_name "${latest_snapshot}" "incr" )
+  aws_key=$( gen_key "${latest_snapshot}" "${aws_directory}" "incr" )
   snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${synced_snapshot}" "${latest_snapshot}" | awk '/size/ {print $2}' )
 
-  log info "Incremental upload '${latest_snapshot}' to 's3://${aws_bucket}/${aws_directory}/${aws_filename}' ($(bytes_to_human "${snapshot_size}"))."
+  log info "Incremental upload '${latest_snapshot}' to 's3://${aws_bucket}/${aws_key}' ($(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cpi "${synced_snapshot}" "${latest_snapshot}" \
         | ${PV} -s "${snapshot_size}" \
-        | ${AWS} s3 cp - "s3://${aws_bucket}/${aws_directory}/${aws_filename}" \
+        | ${AWS} s3 cp - "s3://${aws_bucket}/${aws_key}" \
           --expected-size "${snapshot_size}" \
           --metadata "${AWS_META_SNAPSHOT_NAME}=${latest_snapshot},${AWS_META_SNAPSHOT_BASE}=${synced_snapshot},${AWS_META_SNAPSHOT_KIND}=incremental" \
           > >(capture_errors) 2>&1; then
     return 1
   fi
 
-  set_tag "${aws_bucket}" "${aws_directory}/${aws_filename}" "${AWS_TAG_UPLOAD_STATUS}" "${STATUS_SUCCESS}"
+  set_tag "${aws_bucket}" "${aws_key}" "${AWS_TAG_UPLOAD_STATUS}" "${STATUS_SUCCESS}"
 }
 
 function check_aws_access {
