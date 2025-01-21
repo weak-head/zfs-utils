@@ -127,22 +127,24 @@ function gen_key {
   local zfs_snapshot=$1
   local aws_directory=$2
   local custom_label=$3
-  local zfs_label
+  local zfs_label=""
+  local timestamp=""
 
   zfs_label="${zfs_snapshot##*@}"
+  timestamp=$( date '+%Y%m%d%H%M%S' )
 
-  echo "${aws_directory}/${zfs_label}_${custom_label}"
+  echo "${aws_directory}/${timestamp}_${zfs_label}_${custom_label}"
 }
 
 function upload {
   local dataset=$1 
   local aws_bucket=$2
   local aws_directory="${dataset//\//.}"
-  local aws_key
-  local uploaded_status
-  local synced_snapshot
-  local latest_snapshot
-  local latest_uploaded
+  local aws_key=""
+  local uploaded_status=""
+  local synced_snapshot=""
+  local latest_snapshot=""
+  local latest_uploaded=""
 
   latest_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
   latest_uploaded=$( ${AWS} s3 ls "s3://${aws_bucket}/${aws_directory}/" | grep -v "/$" | sort -r | head -1 | awk '{print $4}' )
@@ -185,8 +187,8 @@ function upload_full {
   local snapshot=$1
   local aws_bucket=$2
   local aws_directory=$3
-  local aws_key
-  local snapshot_size
+  local aws_key=""
+  local snapshot_size=""
 
   aws_key=$( gen_key "${snapshot}" "${aws_directory}" "full" )
   snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${snapshot}" | awk '/size/ {print $2}' )
@@ -210,8 +212,8 @@ function upload_incr {
   local latest_snapshot=$2
   local aws_bucket=$3
   local aws_directory=$4
-  local aws_key
-  local snapshot_size
+  local aws_key=""
+  local snapshot_size=""
 
   aws_key=$( gen_key "${latest_snapshot}" "${aws_directory}" "incr" )
   snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${synced_snapshot}" "${latest_snapshot}" | awk '/size/ {print $2}' )
