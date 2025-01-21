@@ -94,14 +94,19 @@ function capture_errors {
 }
 
 function get_tag {
-  local aws_bucket=$1 aws_key=$2 tag_key=$3
+  local aws_bucket=$1
+  local aws_key=$2
+  local tag_key=$3
 
   ${AWS} s3api get-object-tagging --bucket "${aws_bucket}" --key "${aws_key}" \
     | ${JQ} -r ".TagSet[] | select(.Key == \"${tag_key}\").Value"
 }
 
 function set_tag {
-  local aws_bucket=$1 aws_key=$2 tag_key=$3 tag_value=$4
+  local aws_bucket=$1
+  local aws_key=$2
+  local tag_key=$3
+  local tag_value=$4
 
   ${AWS} s3api put-object-tagging \
     --bucket "${aws_bucket}" --key "${aws_key}" \
@@ -110,26 +115,31 @@ function set_tag {
 }
 
 function get_meta {
-  local aws_bucket=$1 aws_key=$2 meta_key=$3
+  local aws_bucket=$1
+  local aws_key=$2
+  local meta_key=$3
 
   ${AWS} s3api head-object --bucket "${aws_bucket}" --key "${aws_key}" --output json \
-    | ${JQ} -r ".Metadata["${meta_key}"]"
+    | ${JQ} -r ".Metadata[\"${meta_key}\"]"
 }
 
 function gen_name {
-  local snapshot=$1 tag=$2
+  local snapshot=$1 
+  local tag=$2
   local label="${snapshot##*@}"
 
   echo "${label}_${tag}"
 }
 
 function upload {
-  local dataset=$1 aws_bucket=$2
+  local dataset=$1 
+  local aws_bucket=$2
   local aws_directory="${dataset//\//.}"
-  local upload_status=""
-  local synced_snapshot=""
-  local latest_snapshot=""
-  local latest_uploaded=""
+  local aws_key
+  local uploaded_status
+  local synced_snapshot
+  local latest_snapshot
+  local latest_uploaded
 
   latest_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
   latest_uploaded=$( ${AWS} s3 ls "s3://${aws_bucket}/${aws_directory}/" | grep -v "/$" | sort -r | head -1 | awk '{print $4}' )
@@ -140,8 +150,9 @@ function upload {
   fi
 
   if [[ -n "${latest_uploaded}" ]]; then
-    uploaded_status=$( get_tag "${aws_bucket}" "${aws_directory}/${latest_uploaded}" "${AWS_TAG_UPLOAD_STATUS}" )
-    uploaded_snapshot=$( get_meta "${aws_bucket}" "${aws_directory}/${latest_uploaded}" "${AWS_META_SNAPSHOT_NAME}" )
+    aws_key="${aws_directory}/${latest_uploaded}"
+    uploaded_status=$( get_tag "${aws_bucket}" "${aws_key}" "${AWS_TAG_UPLOAD_STATUS}" )
+    uploaded_snapshot=$( get_meta "${aws_bucket}" "${aws_key}" "${AWS_META_SNAPSHOT_NAME}" )
 
     if [[ "${uploaded_status}" == "${STATUS_SUCCESS}" && -n "${uploaded_snapshot}" ]]; then
       synced_snapshot=$( ${ZFS} list -Ht snap -o name | grep "^${uploaded_snapshot}$" )
@@ -156,7 +167,7 @@ function upload {
       fi
 
     else
-      log warn "Incremental upload cannot proceed: '${aws_directory}/${latest_uploaded}' is incomplete."
+      log warn "Incremental upload cannot proceed: '${aws_key}' is incomplete."
     fi
   fi
 
@@ -168,7 +179,9 @@ function upload {
 }
 
 function upload_full {
-  local snapshot=$1 aws_bucket=$2 aws_directory=$3
+  local snapshot=$1
+  local aws_bucket=$2
+  local aws_directory=$3
   local aws_filename=""
   local snapshot_size=""
 
@@ -190,7 +203,10 @@ function upload_full {
 }
 
 function upload_incr {
-  local synced_snapshot=$1 latest_snapshot=$2 aws_bucket=$3 aws_directory=$4
+  local synced_snapshot=$1
+  local latest_snapshot=$2
+  local aws_bucket=$3
+  local aws_directory=$4
   local aws_filename=""
   local snapshot_size=""
 
