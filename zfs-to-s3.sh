@@ -38,7 +38,7 @@ declare -A COLORS=(
   [CMD]='\033[0;34m'    # Blue
   [ARGS]='\033[0;35m'   # Magenta
   # -- message severity
-  [INFO]='\033[0;36mℹ️ '     # Cyan
+  [INFO]='\033[0;37mℹ️ '     # White
   [WARN]='\033[0;33m⚡ '    # Yellow
   [ERROR]='\033[0;31m❌ '   # Red
 )
@@ -81,9 +81,9 @@ function print_usage {
 function log {
   local level=$1; shift
   case $level in
-    (err*) logger -t "zfs-to-s3" -p "user.err" "$*"; echo -e "${COLORS[ERROR]}Error: $*${NC}" 2>&2 ;;
-    (war*) logger -t "zfs-to-s3" -p "user.warning" "$*"; echo -e "${COLORS[WARN]}Warning: $*${NC}" 1>&2 ;;
-    (inf*) logger -t "zfs-to-s3" -p "user.info" "$*"; echo -e "${COLORS[INFO]}$*${NC}" ;;
+    (err*) logger -t "zfs-to-s3" -p "user.err" "$*"; echo -e "${COLORS[ERROR]}Error:${NC} $*" 2>&2 ;;
+    (war*) logger -t "zfs-to-s3" -p "user.warning" "$*"; echo -e "${COLORS[WARN]}Warning:${NC} $*" 1>&2 ;;
+    (inf*) logger -t "zfs-to-s3" -p "user.info" "$*"; echo -e "${COLORS[INFO]}${NC}$*" ;;
   esac
 }
 
@@ -196,7 +196,7 @@ function upload_full {
   log info "Full upload '${snapshot}' to 's3://${aws_bucket}/${aws_key}' ($(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cp "${snapshot}" \
-        | ${PV} -s "${snapshot_size}" \
+        | ${PV} --size "${snapshot_size}" --progress --rate --width 60 \
         | ${AWS} s3 cp - "s3://${aws_bucket}/${aws_key}" \
           --expected-size "${snapshot_size}" \
           --metadata "${AWS_META_SNAPSHOT_NAME}=${snapshot},${AWS_META_SNAPSHOT_KIND}=full" \
@@ -221,7 +221,7 @@ function upload_incr {
   log info "Incremental upload '${latest_snapshot}' to 's3://${aws_bucket}/${aws_key}' ($(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cpi "${synced_snapshot}" "${latest_snapshot}" \
-        | ${PV} -s "${snapshot_size}" \
+        | ${PV} --size "${snapshot_size}" --progress --rate --width 60 \
         | ${AWS} s3 cp - "s3://${aws_bucket}/${aws_key}" \
           --expected-size "${snapshot_size}" \
           --metadata "${AWS_META_SNAPSHOT_NAME}=${latest_snapshot},${AWS_META_SNAPSHOT_BASE}=${synced_snapshot},${AWS_META_SNAPSHOT_KIND}=incremental" \
