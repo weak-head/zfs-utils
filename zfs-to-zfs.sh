@@ -33,7 +33,7 @@ ZFS=$(command -v zfs)
 readonly PV ZFS
 
 function print_usage {
-  local VERSION="v0.2.0"
+  local VERSION="v0.3.0"
 
   echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
   echo -e ""
@@ -59,9 +59,9 @@ function print_usage {
 function log {
   local level=$1; shift
   case $level in
-    (err*) logger -t "zfs-to-zfs" -p "user.err" "$*"; echo -e "${COLORS[ERROR]}Error: $*${NC}" 2>&2 ;;
-    (war*) logger -t "zfs-to-zfs" -p "user.warning" "$*"; echo -e "${COLORS[WARN]}Warning: $*${NC}" 1>&2 ;;
-    (inf*) logger -t "zfs-to-zfs" -p "user.info" "$*"; echo -e "${COLORS[INFO]}$*${NC}" ;;
+    (err*) logger -t "zfs-to-zfs" -p "user.err" "$*"; echo -e "${COLORS[ERROR]}Error:${NC} $*" 2>&2 ;;
+    (war*) logger -t "zfs-to-zfs" -p "user.warning" "$*"; echo -e "${COLORS[WARN]}Warning:${NC} $*" 1>&2 ;;
+    (inf*) logger -t "zfs-to-zfs" -p "user.info" "$*"; echo -e "${COLORS[INFO]}${NC}$*" ;;
   esac
 }
 
@@ -82,13 +82,13 @@ function replicate_dataset {
   target_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${target_dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
 
   if [[ -z "${source_snapshot}" ]]; then
-    log err "Replication aborted: No snapshots found for source dataset '${source_dataset}'."
+    log err "Replication aborted: No '${source_dataset}' snapshots."
     return 1
   fi
   
   if [[ -n "${target_snapshot}" ]]; then
     if [[ "${source_snapshot#*@}" == "${target_snapshot#*@}" ]]; then
-      log info "Replication skipped: source '${source_dataset}' is already replicted to the target '${target_dataset}'."
+      log info "Replication skipped: '${source_dataset}' is already replicted."
       return 0
     fi
 
@@ -99,6 +99,8 @@ function replicate_dataset {
               "Manual intervention is required to restore continuity."
       return 1
     fi
+    
+    log info "Found common '${base_snapshot}' base snapshot."
 
     replicate_incr "${base_snapshot}" "${source_snapshot}" "${target_dataset}"
   else
@@ -113,11 +115,10 @@ function replicate_full {
 
   snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${source_snapshot}" | awk '/size/ {print $2}' )
 
-  log info "Initiating full replication of snapshot '${source_snapshot}'" \
-           "to dataset '${target_dataset}' (size: $(bytes_to_human "${snapshot_size}"))."
+  log info "Full replication of '${source_snapshot}' to '${target_dataset}' ($(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cp "${source_snapshot}" \
-        | ${PV} -s "${snapshot_size}" \
+        | ${PV} --size "${snapshot_size}" --progress --rate --width 60 \
         | ${ZFS} recv "${target_dataset}" > >(capture_errors) 2>&1; then
     return 1
   fi
@@ -131,11 +132,10 @@ function replicate_incr {
   
   snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${base_snapshot}" "${change_snapshot}" | awk '/size/ {print $2}' )
 
-  log info "Initiating incremental replication from snapshot '${base_snapshot}'" \
-           "to '${change_snapshot}' for dataset '${target_dataset}' (size: $(bytes_to_human "${snapshot_size}"))."
+  log info "Incremental replication of '${change_snapshot}' to '${target_dataset}' ($(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cpi "${base_snapshot}" "${change_snapshot}" \
-        | ${PV} -s "${snapshot_size}" \
+        | ${PV} --size "${snapshot_size}" --progress --rate --width 60 \
         | ${ZFS} recv "${target_dataset}" > >(capture_errors) 2>&1; then
     return 1
   fi
@@ -171,11 +171,11 @@ fi
 ${ZFS} list -o name,"${META_REPLICATION_TARGET}" -H -r \
     | awk -F '\t' '$2 != "-" && $1 != $2' \
     | while IFS=$'\t' read -r source target; do
-  log info "Starting replication of dataset '${source}' to '${target}'."
+  log info "Preparing replication of '${source}' to '${target}'."
 
   if replicate_dataset "${source}" "${target}"; then
-    log info "Source dataset '${source}' is replicated to target dataset '${target}'."
+    log info "Replicated '${source}' to '${target}'."
   else
-    log err "Failed to replicate source dataset '${source}' to target dataset '${target}'."
+    log err "Failed to replicate '${source}'."
   fi
 done

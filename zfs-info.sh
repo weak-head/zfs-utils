@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# This script provides a summary of ZFS metadata properties for all ZFS datasets.
+# It fetches and formats custom metadata properties, such as:
+#   - zfs-utils:auto-snap           - Indicates if automatic snapshots are enabled.
+#   - zfs-utils:aws-bucket          - Specifies the associated AWS S3 bucket (if any).
+#   - zfs-utils:replication-target  - Specifies the target dataset for replication.
+
+set -o nounset
+set -o pipefail
 
 readonly NC='\033[0m' # No Color
 declare -A COLORS=(
@@ -13,8 +21,7 @@ declare -A COLORS=(
 )
 
 ZFS=$(command -v zfs)
-AWK=$(command -v awk)
-readonly ZFS AWK
+readonly ZFS
 
 function print_usage {
   local VERSION="v0.3.0"
@@ -40,16 +47,17 @@ while [[ "$#" -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${ZFS}" || -z "${AWK}" ]]; then
-  echo -e "${COLORS[ERROR]}Missing required binaries: zfs, awk.${NC}\n"
+if [[ -z "${ZFS}" ]]; then
+  echo -e "${COLORS[ERROR]}Missing required binary: zfs.${NC}\n"
   exit 1
 fi
 
+# shellcheck disable=SC2016
 ${ZFS} get -H \
     -o name,property,value \
     -t filesystem,volume \
     zfs-utils:auto-snap,zfs-utils:aws-bucket,zfs-utils:replication-target | \
-${AWK} '
+awk '
 BEGIN { 
     header = sprintf("%-30s %-20s %-30s %-30s", "Dataset", "Auto-Snap", "AWS Bucket", "Replication Target"); 
     separator = "-------------------------------------------------------------------------------------------------------------"; 
@@ -63,9 +71,9 @@ END {
     for (dataset in data) {
         printf "%-30s %-20s %-30s %-30s\n", 
             dataset, 
-            (data[dataset]["zfs-utils:auto-snap"] ? data[dataset]["zfs-utils:auto-snap"] : "N/A"), 
-            (data[dataset]["zfs-utils:aws-bucket"] ? data[dataset]["zfs-utils:aws-bucket"] : "N/A"), 
-            (data[dataset]["zfs-utils:replication-target"] ? data[dataset]["zfs-utils:replication-target"] : "N/A");
+            (data[dataset]["zfs-utils:auto-snap"] ? data[dataset]["zfs-utils:auto-snap"] : "-"),
+            (data[dataset]["zfs-utils:aws-bucket"] ? data[dataset]["zfs-utils:aws-bucket"] : "-"),
+            (data[dataset]["zfs-utils:replication-target"] ? data[dataset]["zfs-utils:replication-target"] : "-");
     }
-}' | ${AWK} 'NR <= 2 {print $0} NR > 2 {print $0 | "sort"}'
+}' | awk 'NR <= 2 {print $0} NR > 2 {print $0 | "sort"}'
 
