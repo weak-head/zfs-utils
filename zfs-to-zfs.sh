@@ -82,13 +82,13 @@ function replicate_dataset {
   target_snapshot=$( ${ZFS} list -Ht snap -o name,creation -p | grep "^${target_dataset}@" | sort -n -k2 | tail -1 | awk '{print $1}' )
 
   if [[ -z "${source_snapshot}" ]]; then
-    log err "Aborted '${source_dataset}': no snapshots."
+    log err "Aborted: no '${source_dataset}' snapshots."
     return 1
   fi
   
   if [[ -n "${target_snapshot}" ]]; then
     if [[ "${source_snapshot#*@}" == "${target_snapshot#*@}" ]]; then
-      log info "Skipped '${source_dataset}': already replicated."
+      log info "Skipped: '${source_dataset}' is already replicated."
       return 0
     fi
 
@@ -115,7 +115,7 @@ function replicate_full {
 
   snapshot_size=$( ${ZFS} send --raw -Pnv -cp "${source_snapshot}" | awk '/size/ {print $2}' )
 
-  log info "Starting '${source_snapshot}' full replication ($(bytes_to_human "${snapshot_size}"))."
+  log info "Full replication: '${source_snapshot}' ($(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cp "${source_snapshot}" \
         | ${PV} --size "${snapshot_size}" --progress --rate --width 60 \
@@ -132,7 +132,7 @@ function replicate_incr {
   
   snapshot_size=$( ${ZFS} send --raw -Pnv -cpi "${base_snapshot}" "${change_snapshot}" | awk '/size/ {print $2}' )
 
-  log info "Starting '${change_snapshot}' incremental replication ($(bytes_to_human "${snapshot_size}"))."
+  log info "Incremental replication: '${change_snapshot}' ($(bytes_to_human "${snapshot_size}"))."
 
   if ! ${ZFS} send --raw -cpi "${base_snapshot}" "${change_snapshot}" \
         | ${PV} --size "${snapshot_size}" --progress --rate --width 60 \
@@ -171,11 +171,11 @@ fi
 ${ZFS} list -o name,"${META_REPLICATION_TARGET}" -H -r \
     | awk -F '\t' '$2 != "-" && $1 != $2' \
     | while IFS=$'\t' read -r source target; do
-  log info "Replicating '${source}' to '${target}'."
+  log info "Initiating '${source}' to '${target}' replication."
 
   if replicate_dataset "${source}" "${target}"; then
-    log info "Replicated '${source}'."
+    log info "Replicated: '${source}'."
   else
-    log err "Failed to replicate '${source}'."
+    log err "Failed: '${source}'."
   fi
 done
