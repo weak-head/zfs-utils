@@ -250,8 +250,29 @@ function check_aws_access {
   fi
 }
 
-function check_zfs_access {
-  return 0
+function check_zfs_permissions {
+  local dataset=$1
+  local required=$2
+  local user permissions original_ifs
+
+  user=$(whoami)
+  if [[ "${user}" == "root" ]]; then
+    return 0
+  fi
+
+  permissions=$( ${ZFS} allow "${dataset}" | grep -E "(${user}|@)")
+
+  # Temporary use comma as the delimiter
+  original_ifs=$IFS
+  IFS=','
+  trap 'IFS=$original_ifs' RETURN
+
+  for perm in ${required}; do
+    if ! grep -q "${perm}" <<< "${permissions}"; then
+      log err "User ${user} does not have 'zfs ${perm}' permission on '${dataset}'."
+      return 1
+    fi
+  done
 }
 
 function check_incomplete_uploads {
@@ -302,7 +323,7 @@ ${ZFS} list -o name,${ZFS_META_AWS_BUCKET} -H -r \
     continue
   fi
 
-  if ! check_zfs_access "${dataset}"; then
+  if ! check_zfs_permissions "${dataset}" "send"; then
     log warn "Skipped '${dataset}': no access to ZFS dataset."
     continue
   fi
