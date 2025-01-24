@@ -31,7 +31,7 @@ ZFS=$(command -v zfs)
 readonly ZFS
 
 function print_usage {
-  local VERSION="v0.2.0"
+  local VERSION="v0.3.0"
 
   echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
   echo -e ""
@@ -70,12 +70,12 @@ function create_snapshot {
 
   # Verify if the requested snapshot already exists
   if ${ZFS} list -Ht snap -o name | grep -q "^${dataset}@${label}$"; then
-    log warn "Snapshot '${dataset}@${label}' already exists. Snapshot creation skipped."
+    log warn "Skipped: '${dataset}@${label}' already exists."
     return 0
   fi
 
   if ${ZFS} snap "${dataset}@${label}" > >(capture_errors) 2>&1; then
-    log info "Snapshot '${dataset}@${label}' created successfully."
+    log info "Created: '${dataset}@${label}'."
   else
     log err "Failed to create snapshot '${label}' for dataset '${dataset}'."
     return 1

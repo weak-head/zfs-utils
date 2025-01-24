@@ -53,7 +53,7 @@ ZFS=$(command -v zfs)
 readonly ZFS
 
 function print_usage {
-  local VERSION="v0.2.0"
+  local VERSION="v0.3.0"
 
   echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
   echo -e ""
