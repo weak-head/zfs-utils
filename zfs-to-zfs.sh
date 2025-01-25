@@ -199,12 +199,12 @@ ${ZFS} list -o name,"${META_REPLICATION_TARGET}" -H -r \
   log info "Replicate '${source}' to '${target}'."
 
   if ! check_zfs_permissions "${source}" "send"; then
-    log warn "Skipped '${source}': no access to '${source}' ZFS dataset."
+    log warn "Skipped '${source}': permission denied for '${source}'."
     continue
   fi
 
   if ! check_zfs_permissions "${target}" "recv"; then
-    log warn "Skipped '${source}': no access to '${target}' ZFS dataset."
+    log warn "Skipped '${source}': permission denied for '${target}'."
     continue
   fi
 
