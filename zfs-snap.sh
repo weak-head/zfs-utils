@@ -53,9 +53,9 @@ function print_usage {
 function log {
   local level=$1; shift
   case $level in
-    (err*) logger -t "zfs-snap" -p "user.err" "$*"; echo -e "${COLORS[ERROR]}Error: $*${NC}" 2>&2 ;;
-    (war*) logger -t "zfs-snap" -p "user.warning" "$*"; echo -e "${COLORS[WARN]}Warning: $*${NC}" 1>&2 ;;
-    (inf*) logger -t "zfs-snap" -p "user.info" "$*"; echo -e "${COLORS[INFO]}$*${NC}" ;;
+    (err*) logger -t "zfs-snap" -p "user.err" "$*"; echo -e "${COLORS[ERROR]}Error:${NC} $*" 2>&2 ;;
+    (war*) logger -t "zfs-snap" -p "user.warning" "$*"; echo -e "${COLORS[WARN]}Warning:${NC} $*" 1>&2 ;;
+    (inf*) logger -t "zfs-snap" -p "user.info" "$*"; echo -e "${COLORS[INFO]}${NC}$*" ;;
   esac
 }
 
@@ -77,9 +77,34 @@ function create_snapshot {
   if ${ZFS} snap "${dataset}@${label}" > >(capture_errors) 2>&1; then
     log info "Created: '${dataset}@${label}'."
   else
-    log err "Failed to create snapshot '${label}' for dataset '${dataset}'."
+    log err "Failed: '${dataset}@${label}'."
     return 1
   fi
+}
+
+function check_zfs_permissions {
+  local dataset=$1
+  local required=$2
+  local user permissions original_ifs
+
+  user=$(whoami)
+  if [[ "${user}" == "root" ]]; then
+    return 0
+  fi
+
+  permissions=$( ${ZFS} allow "${dataset}" | grep -E "(${user}|@)")
+
+  # Temporary use comma as the delimiter
+  original_ifs=$IFS
+  IFS=','
+  trap 'IFS=$original_ifs' RETURN
+
+  for perm in ${required}; do
+    if ! grep -q "${perm}" <<< "${permissions}"; then
+      log err "User ${user} does not have 'zfs ${perm}' permission on '${dataset}'."
+      return 1
+    fi
+  done
 }
 
 while [[ "$#" -gt 0 ]]; do
@@ -106,5 +131,11 @@ label=$(date -u +'%Y-%m-%d')
 ${ZFS} list -H -o name,"${META_AUTO_SNAP}" -r \
     | awk -v auto_snap="${META_AUTO_SNAP}" '$2 == "true"' \
     | while IFS=$'\t' read -r dataset _; do
+
+  if ! check_zfs_permissions "${dataset}" "snap"; then
+    log warn "Skipped '${dataset}': permission denied."
+    continue
+  fi
+
   create_snapshot "${dataset}" "${label}"
 done

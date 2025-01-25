@@ -156,6 +156,31 @@ function bytes_to_human {
   echo "${bytes}${decimal_part} ${suffixes[${suffix_index}]}"
 }
 
+function check_zfs_permissions {
+  local dataset=$1
+  local required=$2
+  local user permissions original_ifs
+
+  user=$(whoami)
+  if [[ "${user}" == "root" ]]; then
+    return 0
+  fi
+
+  permissions=$( ${ZFS} allow "${dataset}" | grep -E "(${user}|@)")
+
+  # Temporary use comma as the delimiter
+  original_ifs=$IFS
+  IFS=','
+  trap 'IFS=$original_ifs' RETURN
+
+  for perm in ${required}; do
+    if ! grep -q "${perm}" <<< "${permissions}"; then
+      log err "User ${user} does not have 'zfs ${perm}' permission on '${dataset}'."
+      return 1
+    fi
+  done
+}
+
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --help) print_usage; exit 0 ;;
@@ -171,7 +196,17 @@ fi
 ${ZFS} list -o name,"${META_REPLICATION_TARGET}" -H -r \
     | awk -F '\t' '$2 != "-" && $1 != $2' \
     | while IFS=$'\t' read -r source target; do
-  log info "Initiating '${source}' to '${target}' replication."
+  log info "Replicate '${source}' to '${target}'."
+
+  if ! check_zfs_permissions "${source}" "send"; then
+    log warn "Skipped '${source}': permission denied for '${source}'."
+    continue
+  fi
+
+  if ! check_zfs_permissions "${target}" "recv"; then
+    log warn "Skipped '${source}': permission denied for '${target}'."
+    continue
+  fi
 
   if replicate_dataset "${source}" "${target}"; then
     log info "Replicated: '${source}'."
