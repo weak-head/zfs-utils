@@ -92,7 +92,7 @@ function check_zfs_permissions {
 
   for perm in ${required}; do
     if ! grep -q "${perm}" <<< "${permissions}"; then
-      log err "User ${user} does not have 'zfs ${perm}' permission on '${dataset}'."
+      echo -e "${COLORS[ERROR]}Error: User ${user} does not have 'zfs ${perm}' permission on '${dataset}'.${NC}"
       return 1
     fi
   done
@@ -186,7 +186,7 @@ for snapshot in "${removals[@]}"; do
 
   dataset="${snapshot%@*}"
   if ! check_zfs_permissions "${dataset}" "destroy"; then
-    log warn "Skipped '${snapshot}': permission denied."
+    echo -e "${COLORS[WARN]}Warning: Skipped '${snapshot}': permission denied${NC}\n"
     continue
   fi
 
