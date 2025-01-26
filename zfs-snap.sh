@@ -107,23 +107,42 @@ function check_zfs_permissions {
   done
 }
 
-while [[ "$#" -gt 0 ]]; do
-  case "$1" in
-    --help) print_usage; exit 0 ;;
-    *) break ;;
-  esac
-done
-
 if [[ -z "$ZFS" ]]; then
   log err "Missing required binary: zfs"
   exit 1
 fi
 
-# Generate an ISO 8601 date label (YYYY-MM-DD) to be used as the snapshot identifier.
-# This label will be applied to all snapshots created in this run.
-# The resulting snapshot name will be in the format: <dataset>@<date>
-# Such as 'odin/services/cloud@2024-10-21'.
-label=$(date -u +'%Y-%m-%d')
+LABEL_FORMAT=""
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --help) print_usage; exit 0 ;;
+    -l|--label)
+      if [[ "$#" -lt 2 || "$2" == -* ]]; then
+        log err "Option '$1' requires an argument.\n"
+        print_usage
+        exit 1
+      fi
+      LABEL_FORMAT="$2"; shift 2 ;;
+    *) break ;;
+  esac
+done
+
+if [[ "$#" -gt 1 ]]; then
+  log err "Unrecognized extra arguments.\n"
+  print_usage
+  exit 1
+fi
+
+if [[ -n "${LABEL_FORMAT}" ]]; then
+  label=$(date -u +"${LABEL_FORMAT}")
+else
+  # Generate an ISO 8601 date label (YYYY-MM-DD) to be used as the snapshot identifier.
+  # This label will be applied to all snapshots created in this run.
+  # The resulting snapshot name will be in the format: <dataset>@<date>
+  # Such as 'odin/services/cloud@2024-10-21'.
+  label=$(date -u +'%Y-%m-%d')
+fi
 
 # List all ZFS datasets recursively, including their custom auto-snapshot property.
 # Filter the output to include only datasets where the auto-snapshot property is set to "true".
