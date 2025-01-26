@@ -152,13 +152,13 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [[ "$#" -gt 0 ]]; then
-  log err "Unrecognized extra arguments.\n"
+  log err "Unrecognized extra arguments: '${COLORS[ARGS]}$*${NC}'.\n"
   print_usage
   exit 1
 fi
 
 if [[ -z "$ZFS" ]]; then
-  log err "Missing required binary: zfs"
+  log err "Missing required binary: ${COLORS[CMD]}zfs${NC}"
   exit 1
 fi
 
