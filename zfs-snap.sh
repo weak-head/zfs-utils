@@ -36,7 +36,35 @@ function print_usage {
   echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
   echo -e ""
   echo -e "${COLORS[TITLE]}Usage:${NC}"
+  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC} ${COLORS[ARGS]}[options]${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Options:${NC}"
+  echo -e "  ${COLORS[ARGS]}-l, --label <format>${NC}       Custom format for the ZFS snapshot label."
+  echo -e "                             The format should follow the '${COLORS[CMD]}date${NC}' command syntax."
+  echo -e "                             If not specified, the default format is 'YYYY-MM-DD'."
+  echo -e "  ${COLORS[ARGS]}--help${NC}                     Display this help message and exit."
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Examples:${NC}"
   echo -e "  ${COLORS[CMD]}$(basename "$0")${NC}"
+  echo -e "      Uses the default label format 'YYYY-MM-DD', e.g., '2025-01-25'."
+  echo -e "      This is a good default format for general snapshot organization."
+  echo -e ""
+  echo -e "  ${COLORS[CMD]}$(basename "$0") ${COLORS[ARGS]}-l daily_%Y-%m-%d${NC}"
+  echo -e "      Generates a snapshot label like 'daily_2025-01-25'."
+  echo -e "      This format is commonly used for daily snapshots."
+  echo -e "      Use this format for regular backups or system state snapshots taken at the same time every day."
+  echo -e ""
+  echo -e "  ${COLORS[CMD]}$(basename "$0") ${COLORS[ARGS]}-l %Y-%m-%d_%H-%M${NC}"
+  echo -e "      Creates a timestamped label like '2025-01-25_15-45'."
+  echo -e "      This format is useful for snapshots that need precise timestamps,"
+  echo -e "      such as when performing snapshots before/after important changes or system updates."
+  echo -e "      Use this format for frequent snapshots or when you want to track snapshots taken at specific times."
+  echo -e ""
+  echo -e "  ${COLORS[CMD]}$(basename "$0") ${COLORS[ARGS]}-l before_migration${NC}"
+  echo -e "      Creates a static snapshot label like 'before_migration'."
+  echo -e "      This format is useful for snapshots associated with specific events or tasks,"
+  echo -e "      such as taking a snapshot before a major system upgrade or data migration."
+  echo -e "      Use this format when a descriptive, static label is more meaningful than a date or timestamp."
   echo -e ""
   echo -e "${COLORS[TITLE]}Description:${NC}"
   echo -e "  This script automates the creation of snapshots for configured ZFS datasets."
@@ -107,23 +135,42 @@ function check_zfs_permissions {
   done
 }
 
+LABEL_FORMAT=""
+
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --help) print_usage; exit 0 ;;
+    -l|--label)
+      if [[ "$#" -lt 2 || "$2" == -* ]]; then
+        log err "Option '$1' requires an argument.\n"
+        print_usage
+        exit 1
+      fi
+      LABEL_FORMAT="$2"; shift 2 ;;
     *) break ;;
   esac
 done
 
-if [[ -z "$ZFS" ]]; then
-  log err "Missing required binary: zfs"
+if [[ "$#" -gt 0 ]]; then
+  log err "Unrecognized extra arguments: '${COLORS[ARGS]}$*${NC}'.\n"
+  print_usage
   exit 1
 fi
 
-# Generate an ISO 8601 date label (YYYY-MM-DD) to be used as the snapshot identifier.
-# This label will be applied to all snapshots created in this run.
-# The resulting snapshot name will be in the format: <dataset>@<date>
-# Such as 'odin/services/cloud@2024-10-21'.
-label=$(date -u +'%Y-%m-%d')
+if [[ -z "$ZFS" ]]; then
+  log err "Missing required binary: ${COLORS[CMD]}zfs${NC}"
+  exit 1
+fi
+
+if [[ -n "${LABEL_FORMAT}" ]]; then
+  label=$(date -u +"${LABEL_FORMAT}")
+else
+  # Generate an ISO 8601 date label (YYYY-MM-DD) to be used as the snapshot identifier.
+  # This label will be applied to all snapshots created in this run.
+  # The resulting snapshot name will be in the format: <dataset>@<date>
+  # Such as 'odin/services/cloud@2024-10-21'.
+  label=$(date -u +'%Y-%m-%d')
+fi
 
 # List all ZFS datasets recursively, including their custom auto-snapshot property.
 # Filter the output to include only datasets where the auto-snapshot property is set to "true".
