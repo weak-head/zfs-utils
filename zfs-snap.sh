@@ -36,7 +36,29 @@ function print_usage {
   echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
   echo -e ""
   echo -e "${COLORS[TITLE]}Usage:${NC}"
+  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC} ${COLORS[ARGS]}[options]${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Options:${NC}"
+  echo -e "  ${COLORS[ARGS]}-l, --label <format>${NC}       Custom format for the ZFS snapshot label."
+  echo -e "                             The format should follow the '${COLORS[CMD]}date${NC}' command syntax."
+  echo -e "                             If not specified, the default format is 'YYYY-MM-DD'."
+  echo -e "  ${COLORS[ARGS]}--help${NC}                     Display this help message and exit."
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Examples:${NC}"
+  echo -e "  ${COLORS[CMD]}$(basename "$0") ${COLORS[ARGS]}-l daily_%Y-%m-%d${NC}"
+  echo -e "      Generates a snapshot label like 'daily_2025-01-25'."
+  echo -e "      This format is commonly used for daily snapshots."
+  echo -e "      Use this format for regular backups or system state snapshots taken at the same time every day."
+  echo -e ""
+  echo -e "  ${COLORS[CMD]}$(basename "$0") ${COLORS[ARGS]}-l %Y-%m-%d_%H-%M${NC}"
+  echo -e "      Creates a timestamped label like '2025-01-25_15-45'."
+  echo -e "      This format is useful for snapshots that need precise timestamps,"
+  echo -e "      such as when performing snapshots before/after important changes or system updates."
+  echo -e "      Use this format for frequent snapshots or when you want to track snapshots taken at specific times."
+  echo -e ""
   echo -e "  ${COLORS[CMD]}$(basename "$0")${NC}"
+  echo -e "      Uses the default label format 'YYYY-MM-DD', e.g., '2025-01-25'."
+  echo -e "      This is a good default format for general snapshot organization."
   echo -e ""
   echo -e "${COLORS[TITLE]}Description:${NC}"
   echo -e "  This script automates the creation of snapshots for configured ZFS datasets."
@@ -107,11 +129,6 @@ function check_zfs_permissions {
   done
 }
 
-if [[ -z "$ZFS" ]]; then
-  log err "Missing required binary: zfs"
-  exit 1
-fi
-
 LABEL_FORMAT=""
 
 while [[ "$#" -gt 0 ]]; do
@@ -128,9 +145,14 @@ while [[ "$#" -gt 0 ]]; do
   esac
 done
 
-if [[ "$#" -gt 1 ]]; then
+if [[ "$#" -gt 0 ]]; then
   log err "Unrecognized extra arguments.\n"
   print_usage
+  exit 1
+fi
+
+if [[ -z "$ZFS" ]]; then
+  log err "Missing required binary: zfs"
   exit 1
 fi
 
