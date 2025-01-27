@@ -41,7 +41,7 @@ declare -A COLORS=(
     [SUCCESS]='\033[0;32m✅ '   # Green
 )
 
-# Determines if confirmation is required before deleting a dataset.  
+# Determines if confirmation is required before deleting a snapshot.  
 # When set to 'true', a confirmation prompt will be displayed.  
 # Use the `-y` flag to bypass this prompt and proceed without confirmation.  
 CONFIRMATION_REQUIRED=true
@@ -57,24 +57,33 @@ readonly CURRENT_DATE
 ZFS=$(command -v zfs)
 readonly ZFS
 
+
 function print_usage {
   local VERSION="v0.3.0"
 
   echo -e "${COLORS[TITLE]}$(basename "$0")${NC} ${COLORS[TEXT]}${VERSION}${NC}"
   echo -e ""
   echo -e "${COLORS[TITLE]}Usage:${NC}"
-  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC} ${COLORS[ARGS]}<pattern1> <pattern2> ... <patternN>${NC}"
+  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC} ${COLORS[ARGS]}[options] <pattern1> ... <patternN>${NC}"
+  echo -e ""
+  echo -e "${COLORS[TITLE]}Options:${NC}"
+  echo -e "  ${COLORS[ARGS]}-y, --yes${NC}    Skip the confirmation prompt and delete all matched dataset snapshots."
+  echo -e "  ${COLORS[ARGS]}--help${NC}       Display this help message and exit."
   echo -e ""
   echo -e "${COLORS[TITLE]}Arguments:${NC}"
   echo -e "  ${COLORS[ARGS]}<pattern1> <pattern2> ... <patternN>${NC}"
   echo -e "      One or more strings used to filter snapshot names."
-  echo -e "      Only snapshots that match any provided patterns will be considered for deletion,"
+  echo -e "      Only snapshots matching any provided patterns will be considered for deletion,"
   echo -e "      provided they meet additional criteria."
   echo -e ""
   echo -e "${COLORS[TITLE]}Examples:${NC}"
   echo -e "  ${COLORS[CMD]}$(basename "$0")${NC} ${COLORS[ARGS]}2024-10 2023${NC}"
   echo -e "      This command will identify and prompt for the deletion of snapshots containing either '2024-10' or '2023'"
-  echo -e "      in their names, while automatically preserving recent snapshots and the latest snapshot of each dataset."
+  echo -e "      in their names, while preserving recent snapshots and the latest snapshot of each dataset."
+  echo -e ""
+  echo -e "  ${COLORS[CMD]}$(basename "$0")${NC} ${COLORS[ARGS]}-y 2024-10${NC}"
+  echo -e "      This command will delete all snapshots containing '2024-10' in their names without prompting for confirmation,"
+  echo -e "      while still preserving recent snapshots and the latest snapshot of each dataset."
   echo -e ""
 }
 
