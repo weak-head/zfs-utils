@@ -41,6 +41,11 @@ declare -A COLORS=(
     [SUCCESS]='\033[0;32m✅ '   # Green
 )
 
+# Determines if confirmation is required before deleting a dataset.  
+# When set to 'true', a confirmation prompt will be displayed.  
+# Use the `-y` flag to bypass this prompt and proceed without confirmation.  
+CONFIRMATION_REQUIRED=true
+
 # Snapshots created within the specified number of days will be excluded
 # from the deletion process to prevent the removal of recent backups.
 # This threshold is set to 7 days by default.
@@ -100,6 +105,7 @@ function check_zfs_permissions {
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
+    -y|--yes) CONFIRMATION_REQUIRED=false; shift;;
     --help) print_usage; exit 0 ;;
     *) break ;;
   esac
@@ -168,15 +174,17 @@ for snapshot in "${removals[@]}"; do
   echo -e "${COLORS[WARN]}${snapshot}${NC}"
 done
 
-echo -e ""
-echo -e "${COLORS[SECTION]}Confirming snapshot removals...${NC}"
-echo -e "-----------------------------------------"
-read -r -p "Are you sure you want to delete the above snapshots? (y/n): " choice
-case "${choice}" in 
-  y|Y ) echo -e "${COLORS[SUCCESS]}Proceeding with deletion...${NC}";;
-  n|N ) echo -e "${COLORS[WARN]}Operation cancelled. No changes made.\n${NC}"; exit 1;;
-  * ) echo -e "${COLORS[ERROR]}Invalid input. Please enter 'y' or 'n'. Exiting.\n${NC}"; exit 1;;
-esac
+if ${CONFIRMATION_REQUIRED}; then
+  echo -e ""
+  echo -e "${COLORS[SECTION]}Confirming snapshot removals...${NC}"
+  echo -e "-----------------------------------------"
+  read -r -p "Are you sure you want to delete the above snapshots? (y/n): " choice
+  case "${choice}" in 
+    y|Y ) echo -e "${COLORS[SUCCESS]}Proceeding with deletion...${NC}";;
+    n|N ) echo -e "${COLORS[WARN]}Operation cancelled. No changes made.\n${NC}"; exit 1;;
+    * ) echo -e "${COLORS[ERROR]}Invalid input. Please enter 'y' or 'n'. Exiting.\n${NC}"; exit 1;;
+  esac
+fi
 
 echo -e ""
 echo -e "${COLORS[SECTION]}Deleting snapshots...${NC}"
