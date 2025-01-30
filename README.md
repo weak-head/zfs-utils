@@ -27,6 +27,12 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Gettings Started](#getting-started)
+- [zfs-snap](#zfs-snap)
+- [zfs-to-zfs](#zfs-to-zfs)
+- [zfs-to-s3](#zfs-to-s3)
+- [zfs-clear](#zfs-clear)
+- [zfs-info](#zfs-info)
+- [Usage Examples](#usage-examples)
 
 ## Overview
 
@@ -66,3 +72,26 @@ make install
 
 To view all datasets and their associated metadata, use the `zfs-info` command.
 
+## zfs-snap
+
+TBD
+
+## zfs-to-zfs
+
+TBD
+
+## zfs-to-s3
+
+TBD
+
+## zfs-clear
+
+TBD
+
+## zfs-info
+
+TBD
+
+## Usage Examples
+
+TBD
