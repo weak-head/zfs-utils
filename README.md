@@ -27,16 +27,17 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Gettings Started](#getting-started)
-- [zfs-info](#zfs-info)
-- [zfs-snap](#zfs-snap)
-- [zfs-clear](#zfs-clear)
-- [zfs-to-zfs](#zfs-to-zfs)
-- [zfs-to-s3](#zfs-to-s3)
+- [Scripts](#scripts)
+  - [zfs-info](#zfs-info)
+  - [zfs-snap](#zfs-snap)
+  - [zfs-clear](#zfs-clear)
+  - [zfs-to-zfs](#zfs-to-zfs)
+  - [zfs-to-s3](#zfs-to-s3)
 - [Usage Examples](#usage-examples)
 
 ## Overview
 
-ZFS Utils is a set of bash scripts for automating ZFS snapshots, cleanup, replication, backups, and metadata inspection. It leverages custom ZFS properties for efficient dataset management.
+ZFS utils is a set of bash scripts for automating ZFS snapshots, cleanup, replication, backups, and metadata inspection. It leverages custom ZFS properties for efficient dataset management.
 
 - `zfs-info`: Displays custom ZFS metadata properties, including snapshot settings, AWS S3 backup configuration, and replication targets.
 - `zfs-snap`: Creates snapshots for configured datasets, typically scheduled via cron.
@@ -78,23 +79,27 @@ make install
 
 To view all datasets and their associated metadata, use the `zfs-info` command.
 
-## zfs-info
+## Scripts
 
 TBD
 
-## zfs-snap
+### zfs-info
 
 TBD
 
-## zfs-clear
+### zfs-snap
 
 TBD
 
-## zfs-to-zfs
+### zfs-clear
 
 TBD
 
-## zfs-to-s3
+### zfs-to-zfs
+
+TBD
+
+### zfs-to-s3
 
 TBD
 
