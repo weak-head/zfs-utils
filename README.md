@@ -27,13 +27,12 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Gettings Started](#getting-started)
-- [Scripts](#scripts)
-  - [zfs-info](#zfs-info)
-  - [zfs-snap](#zfs-snap)
-  - [zfs-clear](#zfs-clear)
-  - [zfs-to-zfs](#zfs-to-zfs)
-  - [zfs-to-s3](#zfs-to-s3)
-- [Usage Examples](#usage-examples)
+- [Typical Setup](#typical-setup)
+- [zfs-info](#zfs-info)
+- [zfs-snap](#zfs-snap)
+- [zfs-clear](#zfs-clear)
+- [zfs-to-zfs](#zfs-to-zfs)
+- [zfs-to-s3](#zfs-to-s3)
 
 ## Overview
 
@@ -82,18 +81,19 @@ make install-cron
 
 To view all datasets and their associated metadata, use the `zfs-info` command.
 
-## Scripts
+## Typical Setup
 
 TBD
 
-### zfs-info
+## zfs-info
 
 TBD
 
-### zfs-snap
+## zfs-snap
 
 `zfs-snap` automates the creation of ZFS snapshots for datasets explicitly configured for automatic snapshotting. 
-Each snapshot is labeled with a timestamp using the default `YYYY-MM-DD` format, though users can customize this label by specifying a format with standard `date` syntax. 
+Each snapshot is labeled with a timestamp using the default `YYYY-MM-DD` format, though users can customize this label by specifying a format with standard `date` syntax.  
+
 The script exclusively detects and processes datasets marked with the `zfs-utils:auto-snap=true` metadata, ensuring that only intended datasets are snapshotted. 
 Additionally, it logs operations with categorized messages, making debugging and tracking actions more efficient and transparent.
 
@@ -124,18 +124,23 @@ zfs-snap -l %Y-%m-%d_%H-%M
 zfs-snap -l before_migration
 ```  
 
-### zfs-clear
+## zfs-clear
 
 TBD
 
-### zfs-to-zfs
+## zfs-to-zfs
 
 TBD
 
-### zfs-to-s3
+## zfs-to-s3
 
 TBD
 
-## Usage Examples
+## Contributing
 
-TBD
+Contributions, bug reports, and feature requests are welcome! Feel free to open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
