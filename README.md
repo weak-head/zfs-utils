@@ -75,6 +75,9 @@ To install the scripts, run:
 ```bash
 # This installs the scripts to `/usr/local/sbin/` 
 make install
+
+# This installs cron jobs to `/etc/cron.d/zfs-utils`
+make install-cron
 ```
 
 To view all datasets and their associated metadata, use the `zfs-info` command.
@@ -89,7 +92,37 @@ TBD
 
 ### zfs-snap
 
-TBD
+`zfs-snap` automates the creation of ZFS snapshots for datasets explicitly configured for automatic snapshotting. 
+Each snapshot is labeled with a timestamp using the default `YYYY-MM-DD` format, though users can customize this label by specifying a format with standard `date` syntax. 
+The script exclusively detects and processes datasets marked with the `zfs-utils:auto-snap=true` metadata, ensuring that only intended datasets are snapshotted. 
+Additionally, it logs operations with categorized messages, making debugging and tracking actions more efficient and transparent.
+
+**Syntax**
+
+```bash
+zfs-snap [--help] [-l <format> | --label <format>]
+```  
+
+**Options**
+
+- `-l <format>`, `--label <format>`: Custom snapshot label format using `date` syntax (default: `YYYY-MM-DD`).  
+- `--help`: Displays usage instructions and exits.  
+
+**Examples**
+
+```bash
+# Creates a snapshot with the default label, e.g., `2025-01-25`.
+zfs-snap
+
+# Creates a snapshot labeled `daily_2025-01-25`, useful for daily backups.
+zfs-snap -l daily_%Y-%m-%d
+
+# Creates a snapshot with a timestamp, e.g., `2025-01-25_15-45`, for precise tracking.
+zfs-snap -l %Y-%m-%d_%H-%M
+
+# Creates a static snapshot labeled `before_migration`, useful for critical system changes.  
+zfs-snap -l before_migration
+```  
 
 ### zfs-clear
 
