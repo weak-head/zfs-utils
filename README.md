@@ -27,7 +27,7 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Gettings Started](#getting-started)
-- [Typical Setup](#typical-setup)
+- [Basic Setup](#basic-setup)
 - [zfs-info](#zfs-info)
 - [zfs-snap](#zfs-snap)
 - [zfs-clear](#zfs-clear)
@@ -81,13 +81,27 @@ make install-cron
 
 To view all datasets and their associated metadata, use the `zfs-info` command.
 
-## Typical Setup
+## Basic Setup
 
 TBD
 
 ## zfs-info
 
-TBD
+This script provides a summary of ZFS metadata properties for all ZFS datasets.  
+It fetches and formats custom metadata properties, such as:
+  - `zfs-utils:auto-snap`: Indicates if automatic snapshots are enabled.
+  - `zfs-utils:aws-bucket`: Specifies the associated AWS S3 bucket (if any).
+  - `zfs-utils:replication-target`: Specifies the target dataset for replication.
+
+**Syntax**
+
+```bash
+zfs-info [--help]
+```
+
+**Options**
+
+- `--help`: Displays usage instructions and exits.  
 
 ## zfs-snap
 
@@ -105,7 +119,7 @@ zfs-snap [--help] [-l <format> | --label <format>]
 
 **Options**
 
-- `-l <format>`, `--label <format>`: Custom snapshot label format using `date` syntax (default: `YYYY-MM-DD`).  
+- `-l <format>`, `--label <format>`: Snapshot label format using `date` syntax.  
 - `--help`: Displays usage instructions and exits.  
 
 **Examples**
