@@ -45,9 +45,9 @@ ZFS utils is a set of bash scripts for automating ZFS snapshots, cleanup, replic
 
 ## Getting Started
 
-This project includes several scripts, each with specific dependencies. The only required dependency for all scripts is `zfs`. Additional dependencies, which depend on the script being used, include `pv`, `aws`, and `jq`.
+This project consists of multiple scripts, each requiring specific dependencies. The only universal requirement is ZFS, while additional dependencies (such as `pv`, `aws`, and `jq`) vary based on the script in use.
 
-The scripts' behavior is controlled through ZFS metadata, which determines whether actions like snapshots, replication, or AWS S3 backups should be performed.
+The scripts use ZFS metadata to determine whether a dataset should be included for a given operation. While the specific action - such as snapshots, replication, or AWS S3 backups - is defined by the invoked script, the metadata helps select which datasets to process.
 
 | Script        | ZFS Metadata Key               | Description                     |
 |---------------|--------------------------------|---------------------------------|
