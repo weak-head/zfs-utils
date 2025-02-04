@@ -27,16 +27,27 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Gettings Started](#getting-started)
+- [zfs-info](#zfs-info)
+- [zfs-snap](#zfs-snap)
+- [zfs-clear](#zfs-clear)
+- [zfs-to-zfs](#zfs-to-zfs)
+- [zfs-to-s3](#zfs-to-s3)
 
 ## Overview
 
-TBD
+ZFS utils is a set of bash scripts for automating ZFS snapshots, cleanup, replication, backups, and metadata inspection. It leverages custom ZFS properties for efficient dataset management.
+
+- `zfs-info`: Displays custom ZFS metadata properties, including snapshot settings, AWS S3 backup configuration, and replication targets.
+- `zfs-snap`: Creates snapshots for configured datasets, typically scheduled via cron.
+- `zfs-clear`: Interactively removes old snapshots based on user-defined patterns while preserving recent and latest snapshots.
+- `zfs-to-zfs`: Automates dataset replication across pools with full and incremental sync.
+- `zfs-to-s3`: Backs up datasets to AWS S3, supporting direct restoration via AWS CLI.
 
 ## Getting Started
 
-This project includes several scripts, each with specific dependencies. The only required dependency for all scripts is `zfs`. Additional dependencies, which depend on the script being used, include `pv`, `aws`, and `jq`.
+This project consists of multiple scripts, each requiring specific dependencies. The only universal requirement is ZFS, while additional dependencies (such as `pv`, `aws`, and `jq`) vary based on the script in use.
 
-The scripts' behavior is controlled through ZFS metadata, which determines whether actions like snapshots, replication, or AWS S3 backups should be performed.
+The scripts use ZFS metadata to determine whether a dataset should be included for a given operation. While the specific action - such as snapshots, replication, or AWS S3 backups - is defined by the invoked script, the metadata helps select which datasets to process.
 
 | Script        | ZFS Metadata Key               | Description                     |
 |---------------|--------------------------------|---------------------------------|
@@ -62,7 +73,93 @@ To install the scripts, run:
 ```bash
 # This installs the scripts to `/usr/local/sbin/` 
 make install
+
+# This installs cron jobs to `/etc/cron.d/zfs-utils`
+make install-cron
+```
+
+By default the following cron schedule is created:
+
+```cron
+# At 01:00 on day-of-month 1 => create ZFS snapshots
+0 1 1 * * root zfs-snap
+
+# At 02:00 on day-of-month 1 => upload ZFS snapshots to AWS S3
+0 2 1 * * root zfs-to-s3
 ```
 
 To view all datasets and their associated metadata, use the `zfs-info` command.
+
+## zfs-info
+
+This script provides a summary of ZFS metadata properties for all ZFS datasets.  
+It fetches and formats custom metadata properties, such as:
+  - `zfs-utils:auto-snap`: Indicates if automatic snapshots are enabled.
+  - `zfs-utils:aws-bucket`: Specifies the associated AWS S3 bucket (if any).
+  - `zfs-utils:replication-target`: Specifies the target dataset for replication.
+
+**Syntax**
+
+```bash
+zfs-info [--help]
+```
+
+**Options**
+
+- `--help`: Displays usage instructions and exits.  
+
+## zfs-snap
+
+`zfs-snap` automates the creation of ZFS snapshots for datasets explicitly configured for automatic snapshotting. 
+Each snapshot is labeled with a timestamp using the default `YYYY-MM-DD` format, though users can customize this label by specifying a format with standard `date` syntax.  
+
+The script exclusively detects and processes datasets marked with the `zfs-utils:auto-snap=true` metadata, ensuring that only intended datasets are snapshotted. 
+Additionally, it logs operations with categorized messages, making debugging and tracking actions more efficient and transparent.
+
+**Syntax**
+
+```bash
+zfs-snap [--help] [-l <format> | --label <format>]
+```  
+
+**Options**
+
+- `-l <format>`, `--label <format>`: Snapshot label format using `date` syntax.  
+- `--help`: Displays usage instructions and exits.  
+
+**Examples**
+
+```bash
+# Creates a snapshot with the default label, e.g., `2025-01-25`.
+zfs-snap
+
+# Creates a snapshot labeled `daily_2025-01-25`, useful for daily backups.
+zfs-snap -l daily_%Y-%m-%d
+
+# Creates a snapshot with a timestamp, e.g., `2025-01-25_15-45`, for precise tracking.
+zfs-snap -l %Y-%m-%d_%H-%M
+
+# Creates a static snapshot labeled `before_migration`, useful for critical system changes.  
+zfs-snap -l before_migration
+```  
+
+## zfs-clear
+
+TBD
+
+## zfs-to-zfs
+
+TBD
+
+## zfs-to-s3
+
+TBD
+
+## Contributing
+
+Contributions, bug reports, and feature requests are welcome! Feel free to open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
 
