@@ -27,7 +27,6 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Gettings Started](#getting-started)
-- [Basic Setup](#basic-setup)
 - [zfs-info](#zfs-info)
 - [zfs-snap](#zfs-snap)
 - [zfs-clear](#zfs-clear)
@@ -79,11 +78,17 @@ make install
 make install-cron
 ```
 
+By default the following cron schedule is created:
+
+```cron
+# At 01:00 on day-of-month 1 => create ZFS snapshots
+0 1 1 * * root zfs-snap
+
+# At 02:00 on day-of-month 1 => upload ZFS snapshots to AWS S3
+0 2 1 * * root zfs-to-s3
+```
+
 To view all datasets and their associated metadata, use the `zfs-info` command.
-
-## Basic Setup
-
-TBD
 
 ## zfs-info
 
