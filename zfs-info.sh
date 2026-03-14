@@ -58,22 +58,52 @@ ${ZFS} get -H \
     -t filesystem,volume \
     zfs-utils:auto-snap,zfs-utils:aws-bucket,zfs-utils:replication-target | \
 awk '
-BEGIN { 
-    header = sprintf("%-30s %-20s %-30s %-30s", "Dataset", "Auto-Snap", "AWS Bucket", "Replication Target"); 
-    separator = "-------------------------------------------------------------------------------------------------------------"; 
-    print header; 
-    print separator; 
-}
 {
+    # 1. Store the raw data into our 2D array
     data[$1][$2] = $3
 }
 END {
+    # 2. Initialize max widths with the length of the column headers
+    max_c1 = length("Dataset")
+    max_c2 = length("Auto-Snap")
+    max_c3 = length("AWS Bucket")
+    max_c4 = length("Replication Target")
+
+    # 3. Iterate through data to find the absolute maximum width for each column
     for (dataset in data) {
-        printf "%-30s %-20s %-30s %-30s\n", 
-            dataset, 
-            (data[dataset]["zfs-utils:auto-snap"] ? data[dataset]["zfs-utils:auto-snap"] : "-"),
-            (data[dataset]["zfs-utils:aws-bucket"] ? data[dataset]["zfs-utils:aws-bucket"] : "-"),
-            (data[dataset]["zfs-utils:replication-target"] ? data[dataset]["zfs-utils:replication-target"] : "-");
+        if (length(dataset) > max_c1) max_c1 = length(dataset)
+        
+        v2 = data[dataset]["zfs-utils:auto-snap"] ? data[dataset]["zfs-utils:auto-snap"] : "-"
+        if (length(v2) > max_c2) max_c2 = length(v2)
+        
+        v3 = data[dataset]["zfs-utils:aws-bucket"] ? data[dataset]["zfs-utils:aws-bucket"] : "-"
+        if (length(v3) > max_c3) max_c3 = length(v3)
+        
+        v4 = data[dataset]["zfs-utils:replication-target"] ? data[dataset]["zfs-utils:replication-target"] : "-"
+        if (length(v4) > max_c4) max_c4 = length(v4)
+    }
+
+    # 4. Add 4 spaces for padding
+    max_c1 += 4; max_c2 += 4; max_c3 += 4; max_c4 += 4
+
+    # 5. Dynamically build the format string (e.g., "%-34s %-24s %-34s %-34s")
+    fmt = sprintf("%%-%ds %%-%ds %%-%ds %%-%ds", max_c1, max_c2, max_c3, max_c4)
+
+    # 6. Print the header using the new dynamic format
+    printf(fmt "\n", "Dataset", "Auto-Snap", "AWS Bucket", "Replication Target")
+    
+    # 7. Dynamically generate and print the separator line (---)
+    total_len = max_c1 + max_c2 + max_c3 + max_c4 + 3 # +3 for the 3 spaces between the 4 columns
+    sep = sprintf("%" total_len "s", "")
+    gsub(/ /, "-", sep)
+    print sep
+
+    # 8. Print the actual formatted data
+    for (dataset in data) {
+        v2 = data[dataset]["zfs-utils:auto-snap"] ? data[dataset]["zfs-utils:auto-snap"] : "-"
+        v3 = data[dataset]["zfs-utils:aws-bucket"] ? data[dataset]["zfs-utils:aws-bucket"] : "-"
+        v4 = data[dataset]["zfs-utils:replication-target"] ? data[dataset]["zfs-utils:replication-target"] : "-"
+        
+        printf(fmt "\n", dataset, v2, v3, v4)
     }
 }' | awk 'NR <= 2 {print $0} NR > 2 {print $0 | "sort"}'
-
